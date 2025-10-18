@@ -1,0 +1,12 @@
+*.exe
+*.o
+*.obj
+*.lib
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.exp
+*.def
+*.manifest

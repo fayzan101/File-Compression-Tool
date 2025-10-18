@@ -23,3 +23,7 @@ uint64_t BitReader::readBits(unsigned count) {
     }
     return value;
 }
+
+bool BitReader::hasMoreBits() const {
+    return byte_pos_ < buffer_.size();
+}

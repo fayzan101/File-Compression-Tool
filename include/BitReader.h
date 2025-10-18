@@ -7,6 +7,7 @@ public:
     BitReader(const std::vector<uint8_t>& buffer);
     bool readBit();
     uint64_t readBits(unsigned count);
+    bool hasMoreBits() const;
 private:
     const std::vector<uint8_t>& buffer_;
     size_t byte_pos_;

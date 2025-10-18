@@ -16,6 +16,11 @@ struct CompressionSettings {
     unsigned extra_passes = 0;
     bool sampling = false;
     bool prefer_speed = false;
+    
+    // Additional settings for fine-tuning
+    bool verbose = false;
+    bool preserve_timestamps = false;
+    std::string comment = "";
 };
 
 inline CompressionSettings make_settings_from_level(unsigned level) {
