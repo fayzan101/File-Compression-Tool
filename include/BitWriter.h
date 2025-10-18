@@ -1,24 +1,18 @@
 #pragma once
-
 #include <vector>
 #include <cstdint>
-#include <string>
-#include <cstddef>
-
-using namespace std;
+#include <ostream>
 
 class BitWriter {
 public:
-    // default constructor
-    BitWriter() : current(0), bitPos(0), bitsWritten(0) {}
+    BitWriter();
     void writeBit(bool bit);
-    void writeBits(const string& bits);
-    const vector<unsigned char>& data() const;
+    void writeBits(uint64_t value, unsigned count);
     void flush();
-    size_t bitCount() const;
+    const std::vector<uint8_t>& getBuffer() const;
+    void writeToStream(std::ostream& os);
 private:
-    vector<unsigned char> buffer;
-    unsigned char current;
-    int bitPos; // 0-7
-    size_t bitsWritten;
+    std::vector<uint8_t> buffer_;
+    uint8_t current_byte_;
+    int bit_pos_;
 };
