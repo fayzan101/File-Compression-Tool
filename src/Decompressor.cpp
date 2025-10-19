@@ -1,8 +1,8 @@
-#include "../include/Decompressor.h"
 #include "../include/HuffmanTree.h"
 #include "../include/BitReader.h"
 #include "../include/ErrorHandler.h"
 #include "../include/Checksum.h"
+#include "../include/Decompressor.h"
 #include <string>
 
 #include <algorithm>
@@ -10,6 +10,8 @@
 #include <iostream>
 #include <unordered_map>
 #include <vector>
+
+#include "../include/LZ77.h"
 
 // Helper: convert int to bitstring of given length
 static std::string bitstring(int code, int len) {
@@ -32,13 +34,18 @@ bool Decompressor::decompress(const std::string& inPath, const std::string& outP
         }
 
         // Read magic
-        char magic[4];
-        in.read(magic, 4);
-        if (in.gcount() != 4) {
+        char magic[8] = {0};
+        in.read(magic, 8);
+        if (in.gcount() < 4) {
             throw huffman::HuffmanError(huffman::ErrorCode::CORRUPTED_HEADER, "Cannot read magic number");
         }
-        if (std::string(magic, 4) != "HUF2") {
-            throw huffman::HuffmanError(huffman::ErrorCode::INVALID_MAGIC, std::string(magic, 4));
+        bool is_hybrid = false;
+        if (std::string(magic, 8).substr(0,8) == "HUF_LZ77") {
+            is_hybrid = true;
+        } else if (std::string(magic, 4) == "HUF2") {
+            // legacy Huffman
+        } else {
+            throw huffman::HuffmanError(huffman::ErrorCode::INVALID_MAGIC, std::string(magic, 8));
         }
 
         // Read 256 code lengths
@@ -115,37 +122,41 @@ bool Decompressor::decompress(const std::string& inPath, const std::string& outP
         std::unordered_map<std::string, unsigned char> rev_codes;
         for (const auto& kv : codes) rev_codes[kv.second] = kv.first;
 
-        // Decode and write output in chunks
+        // Decode Huffman
+        std::vector<unsigned char> huff_decoded;
+        {
+            BitReader reader(crc_buf);
+            std::string cur;
+            while (reader.hasMoreBits()) {
+                cur.clear();
+                while (true) {
+                    if (!reader.hasMoreBits()) break;
+                    bool bit = reader.readBit();
+                    cur += bit ? '1' : '0';
+                    auto it = rev_codes.find(cur);
+                    if (it != rev_codes.end()) {
+                        huff_decoded.push_back(it->second);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // If hybrid, apply LZ77 decompression
+        std::vector<unsigned char> final_out;
+        if (is_hybrid) {
+            auto tokens = LZ77::bytesToTokens(huff_decoded);
+            final_out = LZ77::decompress(tokens);
+        } else {
+            final_out = std::move(huff_decoded);
+        }
+
+        // Write output file
         std::ofstream out(outPath, std::ios::binary);
         if (!out) {
             throw huffman::HuffmanError(huffman::ErrorCode::FILE_WRITE_ERROR, outPath);
         }
-        BitReader reader(crc_buf);
-        std::string cur;
-        std::vector<unsigned char> outdata;
-        outdata.reserve(CHUNK_SIZE);
-        while (reader.hasMoreBits()) {
-            cur.clear();
-            while (true) {
-                if (!reader.hasMoreBits()) break;
-                bool bit = reader.readBit();
-                cur += bit ? '1' : '0';
-                auto it = rev_codes.find(cur);
-                if (it != rev_codes.end()) {
-                    outdata.push_back(it->second);
-                    break;
-                }
-            }
-            // Write chunk if buffer is full
-            if (outdata.size() >= CHUNK_SIZE) {
-                out.write(reinterpret_cast<const char*>(outdata.data()), outdata.size());
-                outdata.clear();
-            }
-        }
-        // Write any remaining data
-        if (!outdata.empty()) {
-            out.write(reinterpret_cast<const char*>(outdata.data()), outdata.size());
-        }
+        out.write(reinterpret_cast<const char*>(final_out.data()), final_out.size());
         if (out.bad()) {
             throw huffman::HuffmanError(huffman::ErrorCode::FILE_WRITE_ERROR, outPath);
         }

@@ -1,3 +1,4 @@
+#include "../include/LZ77.h"
 
 #include <fstream>
 #include <iostream>
@@ -133,21 +134,15 @@ bool Compressor::compressInternal(const std::string& inPath, const std::string& 
             throw huffman::HuffmanError(huffman::ErrorCode::FILE_NOT_FOUND, inPath);
         }
 
-        // First pass: count frequencies in chunks
-        std::unordered_map<unsigned char, uint64_t> freq;
-        size_t total = 0;
-        std::vector<unsigned char> buffer(CHUNK_SIZE);
-        while (in) {
-            in.read(reinterpret_cast<char*>(buffer.data()), CHUNK_SIZE);
-            std::streamsize bytesRead = in.gcount();
-            if (bytesRead <= 0) break;
-            total += static_cast<size_t>(bytesRead);
-            for (std::streamsize i = 0; i < bytesRead; ++i) freq[buffer[i]]++;
-        }
+        // Read input file into buffer
+        std::vector<uint8_t> input_data;
         in.clear();
+        in.seekg(0, std::ios::end);
+        std::streamsize file_size = in.tellg();
         in.seekg(0, std::ios::beg);
-
-        if (total == 0) {
+        input_data.resize(file_size);
+        in.read(reinterpret_cast<char*>(input_data.data()), file_size);
+        if (input_data.empty()) {
             std::ofstream out(outPath, std::ios::binary);
             if (!out) {
                 throw huffman::HuffmanError(huffman::ErrorCode::FILE_WRITE_ERROR, outPath);
@@ -158,12 +153,18 @@ bool Compressor::compressInternal(const std::string& inPath, const std::string& 
             return true;
         }
 
+        // LZ77 compression
+        auto lz_tokens = LZ77::compress(input_data);
+        auto lz_bytes = LZ77::tokensToBytes(lz_tokens);
+
+        // Count frequencies for Huffman
+        std::unordered_map<unsigned char, uint64_t> freq;
+        for (unsigned char c : lz_bytes) freq[c]++;
+
         if (settings.verbose) {
-            std::cout << "Compressing with level " << settings.level
-                      << " (mode: " << (settings.mode == huffman::CompressionSettings::FAST ? "FAST" :
-                                        settings.mode == huffman::CompressionSettings::DEFAULT ? "DEFAULT" : "BEST")
-                      << ")" << std::endl;
-            std::cout << "Input size: " << total << " bytes" << std::endl;
+            std::cout << "Hybrid compression (LZ77 + Huffman)\n";
+            std::cout << "Input size: " << input_data.size() << " bytes\n";
+            std::cout << "LZ77 output size: " << lz_bytes.size() << " bytes\n";
             std::cout << "Unique symbols: " << freq.size() << std::endl;
         }
 
@@ -179,7 +180,7 @@ bool Compressor::compressInternal(const std::string& inPath, const std::string& 
         }
 
         // Write header: magic + code lengths for all 256 symbols
-        out.write("HUF2", 4);
+        out.write("HUF_LZ77", 8); // new magic for hybrid
         HuffmanTree::CodeLenTable code_lens = tree.getCodeLengths();
         for (int i = 0; i < 256; ++i) {
             unsigned char len = 0;
@@ -188,28 +189,11 @@ bool Compressor::compressInternal(const std::string& inPath, const std::string& 
             out.put(len);
         }
 
-        // Second pass: encode data in chunks
-        in.clear();
-        in.seekg(0, std::ios::beg);
+        // Huffman encode LZ77 bytes
         BitWriter writer;
-        size_t processed = 0;
-        while (in) {
-            in.read(reinterpret_cast<char*>(buffer.data()), CHUNK_SIZE);
-            std::streamsize bytesRead = in.gcount();
-            if (bytesRead <= 0) break;
-            for (std::streamsize i = 0; i < bytesRead; ++i) {
-                const std::string& bits = canonical_codes[buffer[i]];
-                for (char b : bits) writer.writeBit(b == '1');
-            }
-            processed += static_cast<size_t>(bytesRead);
-            if (settings.progress) {
-                int percent = static_cast<int>((processed) * 100 / total);
-                std::cout << "\rCompressing: " << percent << "% [";
-                int bar = percent / 2;
-                for (int j = 0; j < 50; ++j) std::cout << (j < bar ? '=' : ' ');
-                std::cout << "] " << processed << "/" << total << std::flush;
-                if (processed == total) std::cout << std::endl;
-            }
+        for (unsigned char c : lz_bytes) {
+            const std::string& bits = canonical_codes[c];
+            for (char b : bits) writer.writeBit(b == '1');
         }
         writer.flush();
         const auto& buf = writer.getBuffer();

@@ -49,16 +49,16 @@ Transform the basic Huffman compressor into a professional-grade, feature-rich c
 - [x] **Memory Optimization** - COMPLETED
 
 ### ✅ Phase 3: Advanced Features
-- [ ] **Tree Visualization** - PENDING
+- [ ] **Tree Visualization** - PENDING(will be done by Pankaj)
 - [x] **Advanced Benchmarking** - COMPLETED
 - [x] **Configuration System** - COMPLETED
-- [ ] **Hybrid Compression** - PENDING
+- [ ] **Hybrid Compression** - COMPLETED
 
 ### ⏳ Phase 4: Professional Polish
 - [ ] **Cross-Platform Build** - PENDING
-- [~] **Comprehensive Testing** - IN PROGRESS
-- [~] **API Documentation** - IN PROGRESS
-- [ ] **Performance Profiling** - PENDING
+- [~] **Comprehensive Testing** -PENDING(WILL BE DONE BY PANKAJ)
+- [~] **API Documentation** - PENDING
+- [~] **Performance Profiling** - IN PROGRESS (profiler tool added)
 
 ## 📊 SUCCESS METRICS
 
@@ -116,6 +116,7 @@ By the end of Stage B, the HuffmanCompressor will be:
 2. **Add CRC32 Checksums** - Data integrity verification
 3. **Enhance Error Messages** - Better user experience
 4. **Add Progress Indicators** - Visual feedback for large files
+5. **Performance Profiling** - Run `src/profiler.exe` to gather metrics per-file
 
 ---
 
