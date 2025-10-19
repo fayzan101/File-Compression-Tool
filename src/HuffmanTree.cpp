@@ -49,3 +49,13 @@ vector<unsigned char> HuffmanTree::serialize() const {
 void HuffmanTree::deserialize(const vector<unsigned char>& data) {
     // Stub: not implemented
 }
+
+HuffmanTree::CodeLenTable HuffmanTree::getCodeLengths() const {
+    // Stub: not implemented
+    return {};
+}
+
+HuffmanTree::CodeTable HuffmanTree::getCanonicalCodes() const {
+    // Stub: not implemented
+    return {};
+}

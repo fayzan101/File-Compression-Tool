@@ -10,7 +10,10 @@ using namespace std;
 
 class HuffmanTree {
 public:
+    // Generate Graphviz DOT representation of the tree
+    std::string toDot() const;
     using CodeTable = unordered_map<unsigned char, string>;
+    using CodeLenTable = unordered_map<unsigned char, int>;
 
     HuffmanTree() = default;
 
@@ -19,6 +22,10 @@ public:
 
     // generate code table
     CodeTable getCodes() const;
+
+    // canonical code table (for header)
+    CodeLenTable getCodeLengths() const;
+    CodeTable getCanonicalCodes() const;
 
     // serialize / deserialize (stubs)
     vector<unsigned char> serialize() const;

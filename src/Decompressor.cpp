@@ -2,6 +2,22 @@
 #include "../include/HuffmanTree.h"
 #include "../include/BitReader.h"
 #include "../include/ErrorHandler.h"
+#include "../include/Checksum.h"
+#include <string>
+
+#include <algorithm>
+#include <fstream>
+#include <iostream>
+#include <unordered_map>
+#include <vector>
+
+// Helper: convert int to bitstring of given length
+static std::string bitstring(int code, int len) {
+    std::string s;
+    for (int i = len - 1; i >= 0; --i) s += ((code >> i) & 1) ? '1' : '0';
+    return s;
+}
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <unordered_map>
@@ -21,19 +37,20 @@ bool Decompressor::decompress(const std::string& inPath, const std::string& outP
         if (in.gcount() != 4) {
             throw huffman::HuffmanError(huffman::ErrorCode::CORRUPTED_HEADER, "Cannot read magic number");
         }
-        if (std::string(magic, 4) != "HUF1") {
+        if (std::string(magic, 4) != "HUF2") {
             throw huffman::HuffmanError(huffman::ErrorCode::INVALID_MAGIC, std::string(magic, 4));
         }
 
-        // Read frequency table size
-        uint16_t table_size = 0;
-        in.read(reinterpret_cast<char*>(&table_size), sizeof(table_size));
-        if (!in) {
-            throw huffman::HuffmanError(huffman::ErrorCode::CORRUPTED_HEADER, "Cannot read table size");
+        // Read 256 code lengths
+        std::unordered_map<unsigned char, int> code_lens;
+        for (int i = 0; i < 256; ++i) {
+            int len = in.get();
+            if (len < 0) throw huffman::HuffmanError(huffman::ErrorCode::CORRUPTED_HEADER, "Unexpected end of file while reading code lengths");
+            if (len > 0) code_lens[(unsigned char)i] = len;
         }
 
         // Handle empty file case
-        if (table_size == 0) {
+        if (code_lens.empty()) {
             std::ofstream out(outPath, std::ios::binary);
             if (!out) {
                 throw huffman::HuffmanError(huffman::ErrorCode::FILE_WRITE_ERROR, outPath);
@@ -42,80 +59,127 @@ bool Decompressor::decompress(const std::string& inPath, const std::string& outP
             return true;
         }
 
-        // Read (symbol, freq) pairs
-        std::unordered_map<unsigned char, uint64_t> freq;
-        for (uint16_t i = 0; i < table_size; ++i) {
-            int sym = in.get();
-            if (sym == EOF) {
-                throw huffman::HuffmanError(huffman::ErrorCode::CORRUPTED_HEADER, "Unexpected end of file while reading frequency table");
-            }
-            uint64_t f = 0;
-            in.read(reinterpret_cast<char*>(&f), sizeof(f));
-            if (!in) {
-                throw huffman::HuffmanError(huffman::ErrorCode::CORRUPTED_HEADER, "Cannot read frequency for symbol " + std::to_string(sym));
-            }
-            freq[static_cast<unsigned char>(sym)] = f;
+        // Read CRC32
+        uint32_t crc_stored = 0;
+        in.read(reinterpret_cast<char*>(&crc_stored), sizeof(crc_stored));
+        if (!in) {
+            throw huffman::HuffmanError(huffman::ErrorCode::CORRUPTED_HEADER, "Cannot read CRC32");
         }
 
-        // Read the rest as compressed data
-        std::vector<unsigned char> buf((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-        if (buf.empty()) {
+        // Stream compressed data and decode in chunks
+        constexpr size_t CHUNK_SIZE = 1024 * 1024; // 1MB
+        std::vector<unsigned char> buf;
+        buf.reserve(CHUNK_SIZE);
+        std::streampos data_start = in.tellg();
+        in.seekg(0, std::ios::end);
+        std::streampos data_end = in.tellg();
+        size_t data_size = static_cast<size_t>(data_end - data_start);
+        in.seekg(data_start, std::ios::beg);
+        size_t bytes_left = data_size;
+
+        // Read all compressed data for CRC check (streaming CRC possible, but keep logic simple)
+        std::vector<unsigned char> crc_buf;
+        while (bytes_left > 0) {
+            size_t to_read = std::min(CHUNK_SIZE, bytes_left);
+            std::vector<unsigned char> temp(to_read);
+            in.read(reinterpret_cast<char*>(temp.data()), to_read);
+            std::streamsize bytesRead = in.gcount();
+            if (bytesRead <= 0) break;
+            crc_buf.insert(crc_buf.end(), temp.begin(), temp.begin() + bytesRead);
+            bytes_left -= static_cast<size_t>(bytesRead);
+        }
+        if (crc_buf.empty()) {
             throw huffman::HuffmanError(huffman::ErrorCode::CORRUPTED_HEADER, "No compressed data found");
         }
-
-    // Build Huffman tree and code table
-    HuffmanTree tree;
-    tree.build(freq);
-
-    auto codes = tree.getCodes();
-
-    // Build reverse code table for decoding
-    std::unordered_map<std::string, unsigned char> rev_codes;
-    for (const auto& kv : codes) rev_codes[kv.second] = kv.first;
-
-    // Decode bitstream
-    BitReader reader(buf);
-    std::vector<unsigned char> outdata;
-    std::string cur;
-    // For each symbol in the original file, decode by traversing bits
-    size_t total = 0;
-    for (const auto& kv : freq) total += kv.second;
-    for (size_t i = 0; i < total; ++i) {
-        cur.clear();
-        while (true) {
-            // Check if we can read a bit
-            if (!reader.hasMoreBits()) {
-                return false; // Unexpected end of stream
-            }
-            bool bit = reader.readBit();
-            // If readBit() returned false due to end of stream, we should have caught it above
-            // So this bit is valid
-            cur += bit ? '1' : '0';
-            auto it = rev_codes.find(cur);
-            if (it != rev_codes.end()) {
-                outdata.push_back(it->second);
-                break;
-            }
+        uint32_t crc_calc = huffman::CRC32::calculate(crc_buf);
+        if (crc_calc != crc_stored) {
+            throw huffman::HuffmanError(huffman::ErrorCode::CORRUPTED_HEADER, "CRC32 mismatch: file may be corrupted");
         }
-    }
 
-        // Write output file
+        // Reconstruct canonical codes
+        std::vector<std::pair<unsigned char, int>> sorted;
+        for (const auto& kv : code_lens) sorted.push_back(kv);
+        std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+            if (a.second != b.second) return a.second < b.second;
+            return a.first < b.first;
+        });
+        std::unordered_map<unsigned char, std::string> codes;
+        int code = 0, prev_len = 0;
+        for (const auto& kv : sorted) {
+            int len = kv.second;
+            if (len != prev_len) code <<= (len - prev_len);
+            codes[kv.first] = bitstring(code, len);
+            code++;
+            prev_len = len;
+        }
+        std::unordered_map<std::string, unsigned char> rev_codes;
+        for (const auto& kv : codes) rev_codes[kv.second] = kv.first;
+
+        // Decode and write output in chunks
         std::ofstream out(outPath, std::ios::binary);
         if (!out) {
             throw huffman::HuffmanError(huffman::ErrorCode::FILE_WRITE_ERROR, outPath);
         }
-        out.write(reinterpret_cast<const char*>(outdata.data()), outdata.size());
-        
+        BitReader reader(crc_buf);
+        std::string cur;
+        std::vector<unsigned char> outdata;
+        outdata.reserve(CHUNK_SIZE);
+        while (reader.hasMoreBits()) {
+            cur.clear();
+            while (true) {
+                if (!reader.hasMoreBits()) break;
+                bool bit = reader.readBit();
+                cur += bit ? '1' : '0';
+                auto it = rev_codes.find(cur);
+                if (it != rev_codes.end()) {
+                    outdata.push_back(it->second);
+                    break;
+                }
+            }
+            // Write chunk if buffer is full
+            if (outdata.size() >= CHUNK_SIZE) {
+                out.write(reinterpret_cast<const char*>(outdata.data()), outdata.size());
+                outdata.clear();
+            }
+        }
+        // Write any remaining data
+        if (!outdata.empty()) {
+            out.write(reinterpret_cast<const char*>(outdata.data()), outdata.size());
+        }
         if (out.bad()) {
             throw huffman::HuffmanError(huffman::ErrorCode::FILE_WRITE_ERROR, outPath);
         }
-        
         return true;
     } catch (const huffman::HuffmanError& e) {
         std::cerr << "Decompression error: " << e.what() << std::endl;
+        switch (e.getCode()) {
+            case huffman::ErrorCode::FILE_NOT_FOUND:
+                std::cerr << "  Suggestion: Check the input file path and ensure the file exists." << std::endl;
+                break;
+            case huffman::ErrorCode::FILE_READ_ERROR:
+            case huffman::ErrorCode::FILE_WRITE_ERROR:
+                std::cerr << "  Suggestion: Check file permissions and disk space." << std::endl;
+                break;
+            case huffman::ErrorCode::INVALID_MAGIC:
+            case huffman::ErrorCode::CORRUPTED_HEADER:
+                std::cerr << "  Suggestion: The file may not be a valid Huffman-compressed file or is corrupted." << std::endl;
+                break;
+            case huffman::ErrorCode::DECOMPRESSION_FAILED:
+                std::cerr << "  Suggestion: Try running with verbose mode for more details." << std::endl;
+                break;
+            case huffman::ErrorCode::INVALID_INPUT:
+                std::cerr << "  Suggestion: Check input arguments and file format." << std::endl;
+                break;
+            case huffman::ErrorCode::MEMORY_ERROR:
+                std::cerr << "  Suggestion: Not enough memory. Try smaller files or close other applications." << std::endl;
+                break;
+            default:
+                break;
+        }
         return false;
     } catch (const std::exception& e) {
         std::cerr << "Unexpected error during decompression: " << e.what() << std::endl;
+        std::cerr << "  Suggestion: Try running with verbose mode or check your input files." << std::endl;
         return false;
     }
 }

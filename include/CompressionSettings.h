@@ -19,6 +19,7 @@ struct CompressionSettings {
     
     // Additional settings for fine-tuning
     bool verbose = false;
+    bool progress = false;
     bool preserve_timestamps = false;
     std::string comment = "";
 };
