@@ -1,7 +1,5 @@
 # HuffmanCompressor - Complete Technical Documentation
 
-**Version:** 1.0.0  
-**Author:** Fayzan  
 **Repository:** github.com/fayzan101/DS-Project  
 **Date:** November 2025
 
