@@ -5,6 +5,7 @@
 #include <thread>
 #include <future>
 #include <mutex>
+#include <atomic>
 #include <vector>
 #include <unordered_map>
 #include "../include/Compressor.h"
@@ -42,6 +43,7 @@ bool Compressor::compressParallel(const std::string& inPath, const std::string& 
         // Compress each chunk in parallel
         std::vector<std::future<void>> futures;
         std::mutex mtx;
+        std::atomic<size_t> completedChunks{0};
         for (size_t i = 0; i < numChunks; ++i) {
             futures.push_back(std::async(std::launch::async, [&, i]() {
                 // Use a local Compressor for each chunk
@@ -65,6 +67,11 @@ bool Compressor::compressParallel(const std::string& inPath, const std::string& 
                 std::vector<unsigned char> outbuf;
                 // Write header: magic + code lengths + CRC32 + compressed data
                 outbuf.insert(outbuf.end(), {'H','U','F','2'});
+                // Write original (uncompressed) chunk size (uint64_t, little-endian)
+                uint64_t orig_size = chunkData.size();
+                for (size_t b = 0; b < sizeof(orig_size); ++b) {
+                    outbuf.push_back((orig_size >> (8 * b)) & 0xFF);
+                }
                 HuffmanTree::CodeLenTable code_lens = tree.getCodeLengths();
                 for (int j = 0; j < 256; ++j) {
                     unsigned char len = 0;
@@ -76,9 +83,29 @@ bool Compressor::compressParallel(const std::string& inPath, const std::string& 
                     outbuf.push_back((crc >> (8 * b)) & 0xFF);
                 }
                 outbuf.insert(outbuf.end(), buf.begin(), buf.end());
-                std::lock_guard<std::mutex> lock(mtx);
-                compressedChunks[i] = std::move(outbuf);
-                chunkSizes[i] = compressedChunks[i].size();
+                {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    compressedChunks[i] = std::move(outbuf);
+                    chunkSizes[i] = compressedChunks[i].size();
+                }
+                // Progress feedback
+                size_t done = ++completedChunks;
+                if (settings.progress) {
+                    // Show percentage progress bar
+                    int percent = static_cast<int>((done * 100) / numChunks);
+                    int bar_width = 50;
+                    int pos = (percent * bar_width) / 100;
+                    std::cout << "\rParallel compression: " << percent << "% [";
+                    for (int p = 0; p < bar_width; ++p) {
+                        if (p < pos) std::cout << "=";
+                        else if (p == pos) std::cout << ">";
+                        else std::cout << " ";
+                    }
+                    std::cout << "] " << done << "/" << numChunks << std::flush;
+                    if (done == numChunks) std::cout << std::endl;
+                } else if (settings.verbose) {
+                    std::cout << "Chunk " << i << " compressed (" << chunkSizes[i] << " bytes)\n";
+                }
             }));
         }
         for (auto& f : futures) f.get();

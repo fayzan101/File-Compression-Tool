@@ -160,9 +160,33 @@ public:
             // Hybrid compression
             Compressor compressor;
             success = compressor.compressInternal(opts.input_file, opts.output_file, settings); // uses hybrid
+            if (success) {
+                auto end = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration<double, std::milli>(end - start).count();
+                size_t orig = std::filesystem::file_size(opts.input_file);
+                size_t comp = huffman::getCompressedFileSize(opts.output_file);
+                std::cout << "Compression successful!" << std::endl;
+                std::cout << "Original size: " << orig << " bytes" << std::endl;
+                std::cout << "Compressed size: " << comp << " bytes" << std::endl;
+                std::cout << "Compression ratio: " << std::fixed << std::setprecision(1)
+                          << (orig > 0 ? (double)comp / orig * 100.0 : 0.0) << "%" << std::endl;
+                std::cout << "Time: " << std::fixed << std::setprecision(2) << duration << " ms" << std::endl;
+            }
         } else if (parallel) {
             Compressor compressor;
             success = compressor.compressParallel(opts.input_file, opts.output_file, settings, 1024 * 1024); // 1MB chunks
+            if (success) {
+                auto end = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration<double, std::milli>(end - start).count();
+                size_t orig = std::filesystem::file_size(opts.input_file);
+                size_t comp = huffman::getCompressedFileSize(opts.output_file);
+                std::cout << "Compression successful!" << std::endl;
+                std::cout << "Original size: " << orig << " bytes" << std::endl;
+                std::cout << "Compressed size: " << comp << " bytes" << std::endl;
+                std::cout << "Compression ratio: " << std::fixed << std::setprecision(1)
+                          << (orig > 0 ? (double)comp / orig * 100.0 : 0.0) << "%" << std::endl;
+                std::cout << "Time: " << std::fixed << std::setprecision(2) << duration << " ms" << std::endl;
+            }
         } else {
             auto result = huffman::compressFile(opts.input_file, opts.output_file, settings);
             success = result.success;
@@ -240,6 +264,25 @@ public:
                 if (!f.empty()) files.push_back(f);
             }
         }
+        // Ask whether to show verbose/progress for Huffman compression during benchmark
+        std::cout << "Show Huffman verbose output? (y/n, default n): ";
+        std::string verboseStr; std::getline(std::cin, verboseStr);
+        bool showVerbose = (!verboseStr.empty() && (verboseStr[0] == 'y' || verboseStr[0] == 'Y'));
+        std::cout << "Show Huffman progress bar? (y/n, default n): ";
+        std::string progressStr; std::getline(std::cin, progressStr);
+        bool showProgress = (!progressStr.empty() && (progressStr[0] == 'y' || progressStr[0] == 'Y'));
+        std::cout << "Enable parallel Huffman compression? (y/n, default n): ";
+        std::string parallelStr; std::getline(std::cin, parallelStr);
+        bool useParallel = (!parallelStr.empty() && (parallelStr[0] == 'y' || parallelStr[0] == 'Y'));
+        std::cout << "Compression level for Huffman (1-9, default 5): ";
+        std::string levelStr; std::getline(std::cin, levelStr);
+        int benchLevel = 5;
+        if (!levelStr.empty()) {
+            try { benchLevel = std::stoi(levelStr); }
+            catch(...) { benchLevel = 5; }
+            if (benchLevel < 1) benchLevel = 1;
+            if (benchLevel > 9) benchLevel = 9;
+        }
         std::cout << "\nBenchmarking files: ";
         for (const auto& f : files) std::cout << f << " ";
         std::cout << std::endl;
@@ -262,7 +305,15 @@ public:
             std::string xz_out = file + ".xz";
             // Huffman
             auto huf_start = std::chrono::high_resolution_clock::now();
-            compressFile({"compress", file, huf_out, 5, false, false});
+            // Build options for Huffman compression based on benchmark prompts
+            Options huffOpts;
+            huffOpts.command = "compress";
+            huffOpts.input_file = file;
+            huffOpts.output_file = huf_out;
+            huffOpts.level = benchLevel;
+            huffOpts.verbose = showVerbose;
+            huffOpts.progress = showProgress;
+            compressFile(huffOpts, useParallel);
             auto huf_end = std::chrono::high_resolution_clock::now();
             size_t huf_size = std::filesystem::file_size(huf_out);
             double huf_time = std::chrono::duration<double, std::milli>(huf_end - huf_start).count();
@@ -307,48 +358,41 @@ int main(int argc, char* argv[]) {
     std::cout << "\nWelcome to HuffmanCompressor!" << std::endl;
     while (true) {
         std::cout << "\nMenu:\n";
-    std::cout << "  1. Compress file\n";
-    std::cout << "  7. Hybrid Compress (LZ77 + Huffman)\n";
-        std::cout << "  2. Decompress file\n";
-        std::cout << "  3. Info (show compressed file info)\n";
-        std::cout << "  4. Benchmark\n";
-        std::cout << "  5. Help\n";
-    // ...existing code...
-    std::cout << "  0. Exit\n";
+        std::cout << "  1. Parallel Compress\n";
+        std::cout << "  2. Hybrid Compress (LZ77 + Huffman)\n";
+        std::cout << "  3. Decompress file\n";
+        std::cout << "  4. Info (show compressed file info)\n";
+        std::cout << "  5. Benchmark\n";
+        std::cout << "  6. Help\n";
+        std::cout << "  0. Exit\n";
         std::cout << "Select an option: ";
         std::string choice;
         std::getline(std::cin, choice);
         if (choice == "0" || choice == "exit" || choice == "quit") break;
         try {
             if (choice == "1") {
-                std::string inPath, outPath, levelStr, verboseStr, progressStr, parallelStr;
+                std::string inPath, outPath, levelStr, progressStr;
                 int level = 5;
-                bool verbose = false, progress = false, parallel = false;
+                bool verbose = true, progress = false, parallel = true;
                 std::cout << "Enter input file path: "; std::getline(std::cin, inPath);
                 std::cout << "Enter output file path: "; std::getline(std::cin, outPath);
                 std::cout << "Compression level (1-9, default 5): "; std::getline(std::cin, levelStr);
                 if (!levelStr.empty()) level = std::stoi(levelStr);
-                std::cout << "Show verbose output? (y/n): "; std::getline(std::cin, verboseStr);
-                if (!verboseStr.empty() && (verboseStr[0] == 'y' || verboseStr[0] == 'Y')) verbose = true;
                 std::cout << "Show progress bar? (y/n): "; std::getline(std::cin, progressStr);
                 if (!progressStr.empty() && (progressStr[0] == 'y' || progressStr[0] == 'Y')) progress = true;
-                std::cout << "Enable parallel compression? (y/n): "; std::getline(std::cin, parallelStr);
-                if (!parallelStr.empty() && (parallelStr[0] == 'y' || parallelStr[0] == 'Y')) parallel = true;
                 HuffmanCLI::compressFile({"compress", inPath, outPath, level, verbose, progress}, parallel);
-            } else if (choice == "7") {
-                std::string inPath, outPath, levelStr, verboseStr, progressStr;
+            } else if (choice == "2") {
+                std::string inPath, outPath, levelStr, progressStr;
                 int level = 5;
-                bool verbose = false, progress = false;
+                bool verbose = true, progress = false;
                 std::cout << "Enter input file path: "; std::getline(std::cin, inPath);
                 std::cout << "Enter output file path: "; std::getline(std::cin, outPath);
                 std::cout << "Compression level (1-9, default 5): "; std::getline(std::cin, levelStr);
                 if (!levelStr.empty()) level = std::stoi(levelStr);
-                std::cout << "Show verbose output? (y/n): "; std::getline(std::cin, verboseStr);
-                if (!verboseStr.empty() && (verboseStr[0] == 'y' || verboseStr[0] == 'Y')) verbose = true;
                 std::cout << "Show progress bar? (y/n): "; std::getline(std::cin, progressStr);
                 if (!progressStr.empty() && (progressStr[0] == 'y' || progressStr[0] == 'Y')) progress = true;
                 HuffmanCLI::compressFile({"compress", inPath, outPath, level, verbose, progress}, false, true);
-            } else if (choice == "2") {
+            } else if (choice == "3") {
                 std::string inPath, outPath, verifyStr, progressStr;
                 bool verify = false, progress = false;
                 std::cout << "Enter input file path: "; std::getline(std::cin, inPath);
@@ -358,17 +402,16 @@ int main(int argc, char* argv[]) {
                 std::cout << "Show progress bar? (y/n): "; std::getline(std::cin, progressStr);
                 if (!progressStr.empty() && (progressStr[0] == 'y' || progressStr[0] == 'Y')) progress = true;
                 HuffmanCLI::decompressFile({"decompress", inPath, outPath, 5, false, progress, verify});
-            } else if (choice == "3") {
+            } else if (choice == "4") {
                 std::string inPath;
                 std::cout << "Enter compressed file path: "; std::getline(std::cin, inPath);
                 HuffmanCLI::showFileInfo({"info", inPath});
-                // ...existing code...
-            } else if (choice == "4") {
-                HuffmanCLI::runBenchmark({"benchmark"});
             } else if (choice == "5") {
+                HuffmanCLI::runBenchmark({"benchmark"});
+            } else if (choice == "6") {
                 HuffmanCLI::printUsage();
             } else {
-                std::cout << "Invalid option. Please enter a number from 0 to 5." << std::endl;
+                std::cout << "Invalid option. Please enter a number from 0 to 6." << std::endl;
             }
         } catch (const huffman::HuffmanError& e) {
             std::cerr << "Error: " << e.what() << std::endl;

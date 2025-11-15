@@ -234,10 +234,26 @@ CompressionResult decompressFile(const std::string& inPath, const std::string& o
 bool isValidCompressedFile(const std::string& path) {
     std::ifstream file(path, std::ios::binary);
     if (!file) return false;
-    
-    char magic[4];
-    file.read(magic, 4);
-    return file.gcount() == 4 && std::string(magic, 4) == "HUF1";
+
+    // Read up to 8 bytes (some magic values are 4, some 7 or 8)
+    char magic[8] = {0};
+    file.read(magic, 8);
+    std::streamsize n = file.gcount();
+    if (n <= 0) return false;
+
+    std::string header(magic, static_cast<size_t>(n));
+
+    // Accept any known magic/header variants produced by the compressor:
+    // - legacy single-chunk empty file: "HUF1"
+    // - legacy huffman: "HUF2"
+    // - hybrid (LZ77 + Huffman): "HUF_LZ77"
+    // - parallel container: "HUF_PAR"
+    if (header.rfind("HUF1", 0) == 0) return true;
+    if (header.rfind("HUF2", 0) == 0) return true;
+    if (header.rfind("HUF_LZ77", 0) == 0) return true;
+    if (header.rfind("HUF_PAR", 0) == 0) return true;
+
+    return false;
 }
 
 size_t getCompressedFileSize(const std::string& path) {

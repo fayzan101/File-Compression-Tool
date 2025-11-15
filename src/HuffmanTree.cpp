@@ -1,5 +1,7 @@
 #include "../include/HuffmanTree.h"
 #include <queue>
+#include <algorithm>
+#include <sstream>
 
 void HuffmanTree::build(const unordered_map<unsigned char, uint64_t>& freq) {
     struct NodeCmp {
@@ -51,11 +53,43 @@ void HuffmanTree::deserialize(const vector<unsigned char>& data) {
 }
 
 HuffmanTree::CodeLenTable HuffmanTree::getCodeLengths() const {
-    // Stub: not implemented
-    return {};
+    CodeLenTable lens;
+    if (!root) return lens;
+    CodeTable codes = getCodes();
+    for (const auto& kv : codes) {
+        lens[kv.first] = static_cast<int>(kv.second.size());
+    }
+    return lens;
 }
 
 HuffmanTree::CodeTable HuffmanTree::getCanonicalCodes() const {
-    // Stub: not implemented
-    return {};
+    CodeTable result;
+    auto lens = getCodeLengths();
+    if (lens.empty()) return result;
+
+    // Build list sorted by length then symbol
+    std::vector<std::pair<unsigned char, int>> items;
+    for (const auto& kv : lens) items.push_back(kv);
+    std::sort(items.begin(), items.end(), [](const auto& a, const auto& b) {
+        if (a.second != b.second) return a.second < b.second;
+        return a.first < b.first;
+    });
+
+    // Assign canonical codes
+    unsigned int code = 0;
+    int prev_len = items.front().second;
+    for (size_t i = 0; i < items.size(); ++i) {
+        int len = items[i].second;
+        if (i > 0) {
+            ++code;
+            if (len > prev_len) code <<= (len - prev_len);
+        }
+        prev_len = len;
+        // Compute bitstring of length `len` from `code`
+        std::string bits;
+        for (int b = len - 1; b >= 0; --b) bits.push_back(((code >> b) & 1) ? '1' : '0');
+        result[items[i].first] = bits;
+    }
+
+    return result;
 }
