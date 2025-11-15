@@ -1,8 +1,8 @@
-    #include "../include/HuffmanTree.h"
-    #include "../include/Compressor.h"
-    #include <unordered_map>
-    #include <fstream>
-    #include <sstream>
+#include "../include/HuffmanTree.h"
+#include "../include/Compressor.h"
+ #include <unordered_map>
+#include <fstream>
+#include <sstream>
 #include "../include/HuffmanCompressor.h"
 #include "../include/CompressionSettings.h"
 #include "../include/FolderCompressor.h"
