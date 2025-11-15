@@ -1,0 +1,33 @@
+# Ignore build artifacts
+*.exe
+*.o
+*.obj
+*.out
+main.exe
+api_server.exe
+
+# Ignore compressed/decompressed files (keep directories)
+compressed/*
+!compressed/.gitkeep
+decompressed/*
+!decompressed/.gitkeep
+
+# Ignore uploads except example
+uploads/*
+!uploads/login.txt
+!uploads/.gitkeep
+
+# IDE and editor files
+.vscode/
+.vs/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log

@@ -392,7 +392,7 @@ int main() {
     });
 
     std::cout << "HuffmanCompressor API Server Starting..." << std::endl;
-    std::cout << "Server will run on http://127.0.0.1:8081" << std::endl;
+    std::cout << "Server will run on http://0.0.0.0:8080" << std::endl;
     std::cout << "\nAvailable endpoints:" << std::endl;
     std::cout << "  GET  / - API information" << std::endl;
     std::cout << "  POST /api/compress - Compress a file" << std::endl;
@@ -403,7 +403,7 @@ int main() {
     std::cout << "  GET  /api/info/<filename> - Get file info" << std::endl;
     std::cout << "\nStarting server..." << std::endl;
 
-    app.bindaddr("127.0.0.1").port(8081).run();
+    app.port(8080).multithreaded().run();
 
 
     
