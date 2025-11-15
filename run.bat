@@ -5,7 +5,7 @@ rem
 setlocal enabledelayedexpansion
 set "SRCFILES="
 for /R src %%f in (*.cpp) do (
-    echo %%f | findstr /I /C:"profiler_unused.cpp" /C:"RestServer.cpp" >nul
+    echo %%f | findstr /I /C:"profiler_unused.cpp" /C:"RestServer.cpp" /C:"api_server.cpp" >nul
     if errorlevel 1 (
         set "SRCFILES=!SRCFILES! "%%f""
     )
@@ -22,6 +22,11 @@ IF %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
+echo Starting API Server in background...
+start "HuffmanCompressor API Server" cmd /k "api_server.exe"
+
+echo.
+echo Running main CLI application...
 main.exe
 
 echo.

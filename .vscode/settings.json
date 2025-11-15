@@ -72,7 +72,19 @@
         "future": "cpp",
         "mutex": "cpp",
         "stop_token": "cpp",
-        "thread": "cpp"
+        "thread": "cpp",
+        "any": "cpp",
+        "array": "cpp",
+        "csignal": "cpp",
+        "map": "cpp",
+        "regex": "cpp",
+        "set": "cpp",
+        "unordered_set": "cpp",
+        "variant": "cpp",
+        "xtree": "cpp",
+        "codecvt": "cpp",
+        "cstdarg": "cpp",
+        "source_location": "cpp"
     },
     "C_Cpp.default.compilerPath": "C:/msys64/ucrt64/bin/g++.exe"
 }

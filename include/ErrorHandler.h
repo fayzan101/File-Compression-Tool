@@ -15,7 +15,8 @@ enum class ErrorCode {
     DECOMPRESSION_FAILED,
     COMPRESSION_FAILED,
     INVALID_INPUT,
-    MEMORY_ERROR
+    MEMORY_ERROR,
+    CHECKSUM_MISMATCH
 };
 
 class HuffmanError : public std::runtime_error {
@@ -50,6 +51,8 @@ private:
                 return "Invalid input: " + message;
             case ErrorCode::MEMORY_ERROR:
                 return "Memory allocation error: " + message;
+            case ErrorCode::CHECKSUM_MISMATCH:
+                return "Checksum mismatch (data corruption detected): " + message;
             default:
                 return "Unknown error: " + message;
         }
