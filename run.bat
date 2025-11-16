@@ -17,7 +17,6 @@ rem
 g++ %SRCFILES% -I include -std=c++17 -O2 -g -w -o main.exe
 IF %ERRORLEVEL% NEQ 0 (
     echo.
-    pause
     exit /b
 )
 
@@ -30,4 +29,3 @@ echo Running main CLI application...
 main.exe
 
 echo.
-pause

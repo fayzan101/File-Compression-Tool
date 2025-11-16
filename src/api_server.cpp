@@ -1,3 +1,4 @@
+    // ...existing code...
 // Define Windows version for ASIO
 #ifdef _WIN32
 #ifndef _WIN32_WINNT
@@ -12,6 +13,7 @@
 #define ASIO_HAS_STD_SHARED_PTR
 #define ASIO_HAS_STD_TYPE_TRAITS
 
+#include "../include/HuffmanTree.h"
 #include "../include/HuffmanCompressor.h"
 #include "../include/FolderCompressor.h"
 #include "../include/CompressionSettings.h"
@@ -38,7 +40,54 @@ void writeFile(const std::string& path, const std::string& content) {
 }
 
 int main() {
+
     crow::SimpleApp app;
+    // API endpoint: POST /api/tree-dot - Generate Huffman tree DOT file for a file in uploads
+    CROW_ROUTE(app, "/api/tree-dot").methods("POST"_method)
+    ([](const crow::request& req) {
+        auto body = crow::json::load(req.body);
+        if (!body) {
+            return crow::response(400, "Invalid JSON");
+        }
+        std::string filename = body["filename"].s();
+        std::string inputPath = "uploads/" + filename;
+        if (!fs::exists(inputPath)) {
+            crow::json::wvalue error;
+            error["error"] = "File not found";
+            error["path"] = inputPath;
+            return crow::response(404, error);
+        }
+        std::ifstream fin(inputPath, std::ios::binary);
+        if (!fin) {
+            crow::json::wvalue error;
+            error["error"] = "Failed to open file";
+            error["path"] = inputPath;
+            return crow::response(500, error);
+        }
+        std::unordered_map<unsigned char, uint64_t> freq;
+        char c;
+        while (fin.get(c)) freq[(unsigned char)c]++;
+        if (freq.empty()) {
+            crow::json::wvalue error;
+            error["error"] = "File is empty or unreadable";
+            return crow::response(400, error);
+        }
+        HuffmanTree tree;
+        tree.build(freq);
+        std::string dot = tree.toDot();
+        // Ensure dot/ directory exists
+        std::string dotDir = "dot";
+        if (!fs::exists(dotDir)) {
+            fs::create_directory(dotDir);
+        }
+        std::string dotPath = dotDir + "/" + filename + ".dot";
+        writeFile(dotPath, dot);
+        crow::json::wvalue response;
+        response["success"] = true;
+        response["dot_file"] = dotPath;
+        response["dot_content"] = dot;
+        return crow::response(200, response);
+    });
 
     // Enable CORS
     app.loglevel(crow::LogLevel::Info);
@@ -55,7 +104,8 @@ int main() {
             "/api/compress-folder - POST - Compress a folder",
             "/api/decompress-folder - POST - Decompress an archive",
             "/api/list - GET - List files in uploads folder",
-            "/api/info/<filename> - GET - Get compressed file info"
+            "/api/info/<filename> - GET - Get compressed file info",
+            "/api/tree-dot - POST - Generate Huffman tree DOT file for a file in uploads"
         });
         return crow::response(200, response);
     });
@@ -403,7 +453,7 @@ int main() {
     std::cout << "  GET  /api/info/<filename> - Get file info" << std::endl;
     std::cout << "\nStarting server..." << std::endl;
 
-    app.port(8080).multithreaded().run();
+    app.port(8081).multithreaded().run();
 
 
     

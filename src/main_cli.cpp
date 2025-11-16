@@ -25,8 +25,7 @@ public:
         bool verbose = false;
         bool progress = false;
         bool verify = false;
-        bool benchmark = false;
-        vector<string> benchmark_files;
+        // ...existing code...
     };
 
     // Simple INI parser for config file
@@ -61,47 +60,44 @@ public:
         cout << "=== INSTRUCTIONS ===" << endl;
         cout << "\n--- FILE COMPRESSION ---" << endl;
         cout << "Option 1: Compress File" << endl;
-        cout << "  • Compresses a single file from the 'uploads' folder" << endl;
-        cout << "  • Output saved to 'compressed' folder with .zip extension" << endl;
-        cout << "  • Automatically chooses best method (parallel for large files)" << endl;
-        cout << "  • Files that don't compress well are stored instead" << endl;
+        cout << "  - Compresses a single file from the 'uploads' folder" << endl;
+        cout << "  - Output saved to 'compressed' folder with .zip extension" << endl;
+        cout << "  - Automatically chooses best method (parallel for large files)" << endl;
+        cout << "  - Files that don't compress well are stored instead" << endl;
         
         cout << "\nOption 2: Hybrid Compress (LZ77 + Huffman)" << endl;
-        cout << "  • Uses LZ77 (pattern matching) + Huffman (entropy coding)" << endl;
-        cout << "  • Best for text files with repetitive content" << endl;
-        cout << "  • Input from 'uploads', output to 'compressed'" << endl;
+        cout << "  - Uses LZ77 (pattern matching) + Huffman (entropy coding)" << endl;
+        cout << "  - Best for text files with repetitive content" << endl;
+        cout << "  - Input from 'uploads', output to 'compressed'" << endl;
         
         cout << "\nOption 3: Decompress File" << endl;
-        cout << "  • Decompresses a single .zip file from 'compressed' folder" << endl;
-        cout << "  • Output saved to 'decompressed' folder" << endl;
-        cout << "  • Automatically handles both compressed and stored files" << endl;
+        cout << "  - Decompresses a single .zip file from 'compressed' folder" << endl;
+        cout << "  - Output saved to 'decompressed' folder" << endl;
+        cout << "  - Automatically handles both compressed and stored files" << endl;
         
         cout << "\n--- FOLDER COMPRESSION ---" << endl;
         cout << "Option 4: Compress Folder" << endl;
-        cout << "  • Compresses entire folder from 'uploads' directory" << endl;
-        cout << "  • Creates archive in 'compressed' folder" << endl;
-        cout << "  • Preserves folder structure and file metadata" << endl;
-        cout << "  • Smart compression: stores files that don't compress well" << endl;
+        cout << "  - Compresses entire folder from 'uploads' directory" << endl;
+        cout << "  - Creates archive in 'compressed' folder" << endl;
+        cout << "  - Preserves folder structure and file metadata" << endl;
+        cout << "  - Smart compression: stores files that don't compress well" << endl;
         
         cout << "\nOption 5: Decompress Archive" << endl;
-        cout << "  • Extracts archive from 'compressed' folder" << endl;
-        cout << "  • Restores to 'decompressed' folder with original structure" << endl;
-        cout << "  • Verifies data integrity using CRC32 checksums" << endl;
+        cout << "  - Extracts archive from 'compressed' folder" << endl;
+        cout << "  - Restores to 'decompressed' folder with original structure" << endl;
+        cout << "  - Verifies data integrity using CRC32 checksums" << endl;
         
         cout << "\nOption 6: List Archive Files" << endl;
-        cout << "  • Shows contents of archive without extracting" << endl;
-        cout << "  • Displays file sizes and compression ratios" << endl;
-        cout << "  • Shows which files are compressed vs stored" << endl;
+        cout << "  - Shows contents of archive without extracting" << endl;
+        cout << "  - Displays file sizes and compression ratios" << endl;
+        cout << "  - Shows which files are compressed vs stored" << endl;
         
         cout << "\n--- ANALYSIS TOOLS ---" << endl;
-        cout << "Option 7: Benchmark" << endl;
-        cout << "  • Compares Huffman vs Gzip vs Bzip2 vs XZ" << endl;
-        cout << "  • Tests compression ratio and speed" << endl;
-        cout << "  • Helps choose best algorithm for your files" << endl;
+        // ...existing code...
         
         cout << "\nOption 8: Info" << endl;
-        cout << "  • Shows detailed information about compressed files" << endl;
-        cout << "  • Validates file format and integrity" << endl;
+        cout << "  - Shows detailed information about compressed files" << endl;
+        cout << "  - Validates file format and integrity" << endl;
         
         cout << "\n--- COMPRESSION LEVELS ---" << endl;
         cout << "  1-3: Fast compression (less compression, faster speed)" << endl;
@@ -109,21 +105,21 @@ public:
         cout << "  7-9: Best compression (maximum compression, slower)" << endl;
         
         cout << "\n--- FOLDER STRUCTURE ---" << endl;
-        cout << "  uploads/       → Place files/folders to compress here" << endl;
-        cout << "  compressed/    → Compressed .zip files stored here" << endl;
-        cout << "  decompressed/  → Extracted files/folders appear here" << endl;
+        cout << "  uploads/       -> Place files/folders to compress here" << endl;
+        cout << "  compressed/    -> Compressed .zip files stored here" << endl;
+        cout << "  decompressed/  -> Extracted files/folders appear here" << endl;
         
         cout << "\n--- FILE FORMATS ---" << endl;
-        cout << "  .zip → Compressed files (Huffman or stored format)" << endl;
+        cout << "  .zip -> Compressed files (Huffman or stored format)" << endl;
         cout << "  Archive format uses magic 'HFAR' for folder archives" << endl;
         cout << "  Stored files use magic 'STOR' when compression doesn't help" << endl;
         
         cout << "\n--- TIPS ---" << endl;
-        cout << "  • Text files compress well (50-70% reduction typical)" << endl;
-        cout << "  • Already compressed files (jpg, png, mp4) won't compress" << endl;
-        cout << "  • Very small files (<100 bytes) are automatically stored" << endl;
-        cout << "  • Use compression level 9 for maximum compression" << endl;
-        cout << "  • Use hybrid mode for files with repetitive patterns" << endl;
+        cout << "  - Text files compress well (50-70% reduction typical)" << endl;
+        cout << "  - Already compressed files (jpg, png, mp4) won't compress" << endl;
+        cout << "  - Very small files (<100 bytes) are automatically stored" << endl;
+        cout << "  - Use compression level 9 for maximum compression" << endl;
+        cout << "  - Use hybrid mode for files with repetitive patterns" << endl;
         cout << "\n";
     }
 
@@ -157,8 +153,7 @@ public:
                 if (opts.level < 1 || opts.level > 9) {
                     throw invalid_argument("Level must be between 1 and 9");
                 }
-            } else if (arg == "--compare-gzip") {
-                opts.benchmark = true;
+            // ...existing code...
             } else if (arg[0] != '-') {
                 if (opts.input_file.empty()) {
                     opts.input_file = arg;
@@ -370,105 +365,7 @@ public:
         }
     }
 
-    static void runBenchmark(const Options& opts) {
-        vector<string> files = opts.benchmark_files;
-        if (files.empty()) {
-            cout << "Enter files to benchmark (comma separated): ";
-            string line; getline(cin, line);
-            istringstream iss(line);
-            string f;
-            while (getline(iss, f, ',')) {
-                if (!f.empty()) files.push_back(f);
-            }
-        }
-        // Ask whether to show verbose/progress for Huffman compression during benchmark
-        cout << "Show Huffman verbose output? (y/n, default n): ";
-        string verboseStr; getline(cin, verboseStr);
-        bool showVerbose = (!verboseStr.empty() && (verboseStr[0] == 'y' || verboseStr[0] == 'Y'));
-        cout << "Show Huffman progress bar? (y/n, default n): ";
-        string progressStr; getline(cin, progressStr);
-        bool showProgress = (!progressStr.empty() && (progressStr[0] == 'y' || progressStr[0] == 'Y'));
-        cout << "Enable parallel Huffman compression? (y/n, default n): ";
-        string parallelStr; getline(cin, parallelStr);
-        bool useParallel = (!parallelStr.empty() && (parallelStr[0] == 'y' || parallelStr[0] == 'Y'));
-        cout << "Compression level for Huffman (1-9, default 5): ";
-        string levelStr; getline(cin, levelStr);
-        int benchLevel = 5;
-        if (!levelStr.empty()) {
-            try { benchLevel = stoi(levelStr); }
-            catch(...) { benchLevel = 5; }
-            if (benchLevel < 1) benchLevel = 1;
-            if (benchLevel > 9) benchLevel = 9;
-        }
-        cout << "\nBenchmarking files: ";
-        for (const auto& f : files) cout << f << " ";
-        cout << endl;
-        cout << left << setw(20) << "File"
-                  << setw(12) << "Orig (KB)"
-                  << setw(12) << "Huff (KB)"
-                  << setw(12) << "Gzip (KB)"
-                  << setw(12) << "Bzip2 (KB)"
-                  << setw(12) << "XZ (KB)"
-                  << setw(10) << "Huff(ms)"
-                  << setw(10) << "Gzip(ms)"
-                  << setw(10) << "Bzip2(ms)"
-                  << setw(10) << "XZ(ms)"
-                  << endl;
-        for (const auto& file : files) {
-            size_t orig_size = filesystem::file_size(file);
-            string huf_out = file + ".huf";
-            string gz_out = file + ".gz";
-            string bz2_out = file + ".bz2";
-            string xz_out = file + ".xz";
-            // Huffman
-            auto huf_start = chrono::high_resolution_clock::now();
-            // Build options for Huffman compression based on benchmark prompts
-            Options huffOpts;
-            huffOpts.command = "compress";
-            huffOpts.input_file = file;
-            huffOpts.output_file = huf_out;
-            huffOpts.level = benchLevel;
-            huffOpts.verbose = showVerbose;
-            huffOpts.progress = showProgress;
-            compressFile(huffOpts, useParallel);
-            auto huf_end = chrono::high_resolution_clock::now();
-            size_t huf_size = filesystem::file_size(huf_out);
-            double huf_time = chrono::duration<double, milli>(huf_end - huf_start).count();
-            // gzip
-            auto gz_start = chrono::high_resolution_clock::now();
-            string gz_cmd = "gzip -kf \"" + file + "\"";
-            system(gz_cmd.c_str());
-            auto gz_end = chrono::high_resolution_clock::now();
-            size_t gz_size = filesystem::file_size(gz_out);
-            double gz_time = chrono::duration<double, milli>(gz_end - gz_start).count();
-            // bzip2
-            auto bz2_start = chrono::high_resolution_clock::now();
-            string bz2_cmd = "bzip2 -kf \"" + file + "\"";
-            system(bz2_cmd.c_str());
-            auto bz2_end = chrono::high_resolution_clock::now();
-            size_t bz2_size = filesystem::file_size(bz2_out);
-            double bz2_time = chrono::duration<double, milli>(bz2_end - bz2_start).count();
-            // xz
-            auto xz_start = chrono::high_resolution_clock::now();
-            string xz_cmd = "xz -kf \"" + file + "\"";
-            system(xz_cmd.c_str());
-            auto xz_end = chrono::high_resolution_clock::now();
-            size_t xz_size = filesystem::file_size(xz_out);
-            double xz_time = chrono::duration<double, milli>(xz_end - xz_start).count();
-            cout << left << setw(20) << file
-                      << setw(12) << (orig_size / 1024)
-                      << setw(12) << (huf_size / 1024)
-                      << setw(12) << (gz_size / 1024)
-                      << setw(12) << (bz2_size / 1024)
-                      << setw(12) << (xz_size / 1024)
-                      << setw(10) << (int)huf_time
-                      << setw(10) << (int)gz_time
-                      << setw(10) << (int)bz2_time
-                      << setw(10) << (int)xz_time
-                      << endl;
-        }
-        cout << "\nBenchmark complete.\n";
-    }
+    // ...existing code...
 };
 
 int main(int argc, char* argv[]) {
@@ -479,11 +376,12 @@ int main(int argc, char* argv[]) {
         cout << "  2. Hybrid Compress (LZ77 + Huffman)\n";
         cout << "  3. Decompress file\n";
         cout << "  4. Compress Folder\n";
-        cout << "  5. Decompress Archive\n";
+        cout << "  5. Decompress Folder\n";
         cout << "  6. List Archive Files\n";
-        cout << "  7. Benchmark\n";
+        // ...existing code...
         cout << "  8. Info (show compressed file info)\n";
-        cout << "  9. Help\n";
+        cout << "  9. Show Huffman Tree (DOT export)\n";
+        cout << " 10. Help\n";
         cout << "  0. Exit\n";
         cout << "Select an option: ";
         string choice;
@@ -491,9 +389,9 @@ int main(int argc, char* argv[]) {
         if (choice == "0" || choice == "exit" || choice == "quit") break;
         try {
             if (choice == "1") {
-                string inName, outName, levelStr, progressStr;
+                string inName, outName, levelStr;
                 int level = 5;
-                bool verbose = true, progress = false;
+                bool verbose = true, progress = true;
                 
                 // List available files in uploads folder
                 cout << "\nAvailable files in uploads folder:" << endl;
@@ -521,8 +419,7 @@ int main(int argc, char* argv[]) {
                 string outPath = "compressed/" + outName;
                 cout << "Compression level (1-9, default 5): "; getline(cin, levelStr);
                 if (!levelStr.empty()) level = stoi(levelStr);
-                cout << "Show progress bar? (y/n): "; getline(cin, progressStr);
-                if (!progressStr.empty() && (progressStr[0] == 'y' || progressStr[0] == 'Y')) progress = true;
+                // Progress bar enabled by default
                 
                 // Use smart compression with automatic parallel/regular selection
                 size_t fileSize = filesystem::file_size(inPath);
@@ -530,14 +427,25 @@ int main(int argc, char* argv[]) {
                 
                 HuffmanCLI::compressFile({"compress", inPath, outPath, level, verbose, progress}, useParallel);
             } else if (choice == "2") {
-                string inName, outName, levelStr, progressStr;
+                string inName, outName, levelStr;
                 int level = 5;
-                bool verbose = true, progress = false;
+                bool verbose = true, progress = true;
+                // List available files in uploads folder
+                cout << "\nAvailable files in uploads folder:" << endl;
+                int fileCount = 0;
+                for (const auto& entry : filesystem::directory_iterator("uploads")) {
+                    if (entry.is_regular_file()) {
+                        cout << "  - " << entry.path().filename().string() << endl;
+                        fileCount++;
+                    }
+                }
+                if (fileCount == 0) {
+                    cout << "  (No files found)" << endl;
+                }
+                cout << endl;
                 cout << "Enter input file name: "; getline(cin, inName);
                 string inPath = "uploads/" + inName;
-                
                 cout << "Enter output file name (without extension): "; getline(cin, outName);
-                
                 // Automatically add .zip extension if not present
                 if (outName.find('.') == string::npos) {
                     outName += ".zip";
@@ -545,12 +453,11 @@ int main(int argc, char* argv[]) {
                 string outPath = "compressed/" + outName;
                 cout << "Compression level (1-9, default 5): "; getline(cin, levelStr);
                 if (!levelStr.empty()) level = stoi(levelStr);
-                cout << "Show progress bar? (y/n): "; getline(cin, progressStr);
-                if (!progressStr.empty() && (progressStr[0] == 'y' || progressStr[0] == 'Y')) progress = true;
+                // Progress bar enabled by default
                 HuffmanCLI::compressFile({"compress", inPath, outPath, level, verbose, progress}, false, true);
             } else if (choice == "3") {
-                string inName, outName, verifyStr, progressStr;
-                bool verify = false, progress = false;
+                string inName, outName, verifyStr;
+                bool verify = false, progress = true;
                 
                 // List available files in compressed folder
                 cout << "\nAvailable files in compressed folder:" << endl;
@@ -578,8 +485,7 @@ int main(int argc, char* argv[]) {
                 string outPath = "decompressed/" + outName;
                 cout << "Verify data integrity? (y/n): "; getline(cin, verifyStr);
                 if (!verifyStr.empty() && (verifyStr[0] == 'y' || verifyStr[0] == 'Y')) verify = true;
-                cout << "Show progress bar? (y/n): "; getline(cin, progressStr);
-                if (!progressStr.empty() && (progressStr[0] == 'y' || progressStr[0] == 'Y')) progress = true;
+                // Progress bar enabled by default
                 HuffmanCLI::decompressFile({"decompress", inPath, outPath, 5, false, progress, verify});
             } else if (choice == "4") {
                 // Compress folder
@@ -727,14 +633,69 @@ int main(int argc, char* argv[]) {
                     cout << "  Compressed files: " << compressed_count << endl;
                     cout << "  Stored files: " << stored_count << endl;
                 }
-            } else if (choice == "7") {
-                HuffmanCLI::runBenchmark({"benchmark"});
+            // ...existing code...
             } else if (choice == "8") {
-                string inPath;
-                cout << "Enter compressed file path: "; 
-                getline(cin, inPath);
+                // Show available files in compressed folder
+                cout << "\nAvailable files in compressed folder:" << endl;
+                int fileCount = 0;
+                for (const auto& entry : filesystem::directory_iterator("compressed")) {
+                    if (entry.is_regular_file()) {
+                        cout << "  - " << entry.path().filename().string() << endl;
+                        fileCount++;
+                    }
+                }
+                if (fileCount == 0) {
+                    cout << "  (No files found)" << endl;
+                }
+                cout << endl;
+                cout << "Enter compressed file name (without extension): ";
+                string inName;
+                getline(cin, inName);
+                // Automatically add .zip extension and use compressed folder
+                if (inName.find('.') == string::npos) {
+                    inName += ".zip";
+                }
+                string inPath = "compressed/" + inName;
                 HuffmanCLI::showFileInfo({"info", inPath});
             } else if (choice == "9") {
+                // Show Huffman Tree (DOT export)
+                // List available files in uploads folder
+                cout << "\nAvailable files in uploads folder:" << endl;
+                int fileCount = 0;
+                for (const auto& entry : filesystem::directory_iterator("uploads")) {
+                    if (entry.is_regular_file()) {
+                        cout << "  - " << entry.path().filename().string() << endl;
+                        fileCount++;
+                    }
+                }
+                if (fileCount == 0) {
+                    cout << "  (No files found)" << endl;
+                }
+                cout << endl;
+                string inName;
+                cout << "Enter input file name (from uploads): ";
+                getline(cin, inName);
+                string inPath = "uploads/" + inName;
+                ifstream fin(inPath, ios::binary);
+                if (!fin) {
+                    cout << "File not found: " << inPath << endl;
+                } else {
+                    unordered_map<unsigned char, uint64_t> freq;
+                    char c;
+                    while (fin.get(c)) freq[(unsigned char)c]++;
+                    if (freq.empty()) {
+                        cout << "File is empty or unreadable." << endl;
+                    } else {
+                        HuffmanTree tree;
+                        tree.build(freq);
+                        string dot = tree.toDot();
+                        ofstream fout("uploads/tree.dot");
+                        fout << dot;
+                        fout.close();
+                        cout << "Huffman tree DOT file written to uploads/tree.dot\n";
+                    }
+                }
+            } else if (choice == "10") {
                 HuffmanCLI::printUsage();
             } else {
                 cout << "Invalid option. Please enter a number from 0 to 9." << endl;

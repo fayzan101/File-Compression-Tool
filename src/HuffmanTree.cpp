@@ -44,12 +44,92 @@ void HuffmanTree::buildCodes(const shared_ptr<HuffmanNode>& node, const string& 
     buildCodes(node->right, prefix + "1", table);
 }
 
-vector<unsigned char> HuffmanTree::serialize() const {
-    // Stub: not implemented
-    return {};
+
+// Helper for serialize
+static void serializeNode(const shared_ptr<HuffmanNode>& node, vector<unsigned char>& out) {
+    if (!node) return;
+    if (!node->left && !node->right) {
+        out.push_back(1); // Leaf marker
+        out.push_back(node->byte);
+    } else {
+        out.push_back(0); // Internal node marker
+        serializeNode(node->left, out);
+        serializeNode(node->right, out);
+    }
 }
+
+vector<unsigned char> HuffmanTree::serialize() const {
+    vector<unsigned char> out;
+    serializeNode(root, out);
+    return out;
+}
+
+// Helper for deserialize
+static shared_ptr<HuffmanNode> deserializeNode(const vector<unsigned char>& data, size_t& pos) {
+    if (pos >= data.size()) throw std::runtime_error("Invalid serialization format: unexpected end of data");
+    unsigned char marker = data[pos++];
+    if (marker == 1) {
+        if (pos >= data.size()) throw std::runtime_error("Invalid serialization format: missing symbol for leaf");
+        unsigned char byte = data[pos++];
+        auto node = make_shared<HuffmanNode>(byte, 0);
+        node->left = nullptr;
+        node->right = nullptr;
+        return node;
+    } else if (marker == 0) {
+        auto left = deserializeNode(data, pos);
+        auto right = deserializeNode(data, pos);
+        // For deterministic parent, use min byte from children
+        unsigned char parent_byte = std::min(left->byte, right->byte);
+        auto parent = make_shared<HuffmanNode>(parent_byte, 0);
+        parent->left = left;
+        parent->right = right;
+        return parent;
+    } else {
+        throw std::runtime_error("Invalid flag byte in serialization: " + std::to_string(marker));
+    }
+}
+
 void HuffmanTree::deserialize(const vector<unsigned char>& data) {
-    // Stub: not implemented
+    size_t pos = 0;
+    root = deserializeNode(data, pos);
+}
+
+// Helper for DOT output
+static std::string escapeLabel(unsigned char c) {
+    if (std::isprint(c))
+        return std::string(1, c);
+    return std::to_string((int)c);
+}
+
+static void toDotNode(const shared_ptr<HuffmanNode>& node, std::ostream& out, std::unordered_map<const HuffmanNode*, int>& ids, int& idCounter) {
+    if (!node) return;
+    if (ids.find(node.get()) == ids.end()) ids[node.get()] = idCounter++;
+    int id = ids[node.get()];
+    bool isleaf = (!node->left && !node->right);
+    if (isleaf) {
+        out << "  node" << id << " [label=\"" << escapeLabel(node->byte) << "\\nFreq: " << node->freq << "\"];\n";
+    } else {
+        out << "  node" << id << " [label=\"Freq: " << node->freq << "\"];\n";
+    }
+    if (node->left) {
+        toDotNode(node->left, out, ids, idCounter);
+        out << "  node" << id << " -> node" << ids[node->left.get()] << " [label=\"0\"];\n";
+    }
+    if (node->right) {
+        toDotNode(node->right, out, ids, idCounter);
+        out << "  node" << id << " -> node" << ids[node->right.get()] << " [label=\"1\"];\n";
+    }
+}
+
+std::string HuffmanTree::toDot() const {
+    if (!root) return "digraph HuffmanTree{}\n";
+    std::ostringstream out;
+    out << "digraph HuffmanTree {\n";
+    int idCounter = 0;
+    std::unordered_map<const HuffmanNode*, int> ids;
+    toDotNode(root, out, ids, idCounter);
+    out << "}\n";
+    return out.str();
 }
 
 HuffmanTree::CodeLenTable HuffmanTree::getCodeLengths() const {
