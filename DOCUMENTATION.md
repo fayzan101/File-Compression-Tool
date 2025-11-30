@@ -17,7 +17,7 @@
 8. [REST API Server](#rest-api-server)
 9. [Build & Deployment](#build--deployment)
 10. [Usage Examples](#usage-examples)
-11. [Performance & Benchmarks](#performance--benchmarks)
+11. [Huffman Tree Visualization & API](#huffman-tree-visualization--api)
 12. [Error Handling](#error-handling)
 13. [Configuration](#configuration)
 14. [Directory Structure](#directory-structure)
@@ -1693,58 +1693,95 @@ int main() {
 
 ---
 
-## Performance & Benchmarks
 
-### Compression Ratios (Typical)
+## Huffman Tree Visualization & API
 
-| File Type | Original | Compressed | Ratio | Level |
-|-----------|----------|------------|-------|-------|
-| Text (English) | 1 MB | 450 KB | 45% | 5 |
-| Source Code (C++) | 500 KB | 180 KB | 36% | 7 |
-| Log File | 10 MB | 3.2 MB | 32% | 9 |
-| JSON Data | 2 MB | 720 KB | 36% | 6 |
-| XML Document | 5 MB | 1.8 MB | 36% | 5 |
-| CSV Data | 20 MB | 6.4 MB | 32% | 7 |
-| Binary (Random) | 1 MB | 1.01 MB | 101% | 5 |
-| JPEG Image | 2 MB | 2.02 MB | 101% | 5 |
-| Already Compressed | 5 MB | 5.05 MB | 101% | 5 |
+### Huffman Tree Overview
 
-**Note:** Files that don't compress well are automatically stored.
+The Huffman tree is a binary tree used to generate optimal prefix codes for data compression. Each leaf node represents a symbol from the input, and the path from the root to a leaf encodes the symbol's bit sequence. The tree is built based on symbol frequencies, ensuring the most frequent symbols have the shortest codes.
 
----
+**Key Features:**
+- Efficient encoding and decoding
+- Canonical code support for compact headers
+- Visualizable as a Graphviz DOT graph
 
-### Speed Benchmarks
+**Core API (C++):**
+```cpp
+// Build tree from frequency table
+void build(const unordered_map<unsigned char, uint64_t>& freq);
 
-**Hardware:** Intel i7-9700K @ 3.6GHz, 16GB RAM
+// Get symbol-to-code mapping
+CodeTable getCodes() const;
 
-| File Size | Level | Mode | Time | Speed |
-|-----------|-------|------|------|-------|
-| 1 MB | 1 | Fast | 45 ms | 22 MB/s |
-| 1 MB | 5 | Default | 125 ms | 8 MB/s |
-| 1 MB | 9 | Best | 342 ms | 3 MB/s |
-| 10 MB | 5 | Parallel | 567 ms | 18 MB/s |
-| 100 MB | 5 | Parallel | 5.2 s | 19 MB/s |
+// Visualize tree (Graphviz DOT format)
+std::string toDot() const;
+```
 
----
+**Example DOT Output:**
+```dot
+digraph HuffmanTree {
+  node [shape=circle];
+  n0 [label="*"];
+  n1 [label="A\n5"];
+  n2 [label="*"];
+  n3 [label="B\n2"];
+  n4 [label="R\n2"];
+  n5 [label="C\n1"];
+  n6 [label="D\n1"];
+  n0 -> n1 [label="0"];
+  n0 -> n2 [label="1"];
+  n2 -> n3 [label="0"];
+  n2 -> n4 [label="1"];
+  // ...
+}
+```
 
-### Comparison with Other Tools
+### API Endpoint: `/api/huffman-tree`
 
-**File:** 10 MB text file
+**Description:** Generate and return the Huffman tree for a given file as a Graphviz DOT string.
 
-| Tool | Ratio | Time | Speed |
-|------|-------|------|-------|
-| **HuffmanCompressor (L5)** | 44% | 1.2s | 8.3 MB/s |
-| **HuffmanCompressor (L9)** | 41% | 3.4s | 2.9 MB/s |
-| Gzip -6 | 38% | 0.9s | 11 MB/s |
-| Bzip2 -9 | 35% | 2.3s | 4.3 MB/s |
-| XZ -6 | 32% | 4.5s | 2.2 MB/s |
-| 7-Zip Ultra | 30% | 6.7s | 1.5 MB/s |
+**Method:** `POST`
 
-**Observations:**
-- Huffman is faster than Bzip2/XZ but slower than Gzip
-- Compression ratio is better than Gzip but worse than XZ
-- Good balance for general-purpose compression
-- Hybrid mode (LZ77+Huffman) can match Bzip2
+**Request:**
+```http
+POST /api/huffman-tree HTTP/1.1
+Host: localhost:8080
+Content-Type: application/json
+
+{
+  "filename": "document.txt"
+}
+```
+
+**Parameters:**
+- `filename` (required): Name of file in `uploads/` folder
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "filename": "document.txt",
+  "dot": "digraph HuffmanTree { ... }"
+}
+```
+
+**Response (Error):**
+```json
+{
+  "success": false,
+  "error": "File not found"
+}
+```
+
+**Implementation Notes:**
+- The endpoint reads the file, computes symbol frequencies, builds the Huffman tree, and returns the DOT representation.
+- The DOT output can be rendered using Graphviz tools or online viewers.
+- This endpoint is useful for educational, debugging, and visualization purposes.
+
+**Example Usage:**
+1. Send a POST request with a filename.
+2. Receive the DOT string in the response.
+3. Paste the DOT string into a Graphviz viewer to visualize the tree.
 
 ---
 

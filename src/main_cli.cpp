@@ -213,8 +213,8 @@ public:
                 size_t orig = filesystem::file_size(opts.input_file);
                 size_t comp = huffman::getCompressedFileSize(opts.output_file);
                 cout << "Compression successful!" << endl;
-                cout << "Original size: " << orig << " bytes" << endl;
-                cout << "Compressed size: " << comp << " bytes" << endl;
+                cout << "Original size: " << orig << " bytes (" << fixed << setprecision(2) << (orig/1024.0) << " KB)" << endl;
+                cout << "Compressed size: " << comp << " bytes (" << fixed << setprecision(2) << (comp/1024.0) << " KB)" << endl;
                 cout << "Compression ratio: " << fixed << setprecision(1)
                           << (orig > 0 ? (double)comp / orig * 100.0 : 0.0) << "%" << endl;
                 cout << "Time: " << fixed << setprecision(2) << duration << " ms" << endl;
@@ -228,8 +228,8 @@ public:
                 size_t orig = filesystem::file_size(opts.input_file);
                 size_t comp = huffman::getCompressedFileSize(opts.output_file);
                 cout << "Compression successful!" << endl;
-                cout << "Original size: " << orig << " bytes" << endl;
-                cout << "Compressed size: " << comp << " bytes" << endl;
+                cout << "Original size: " << orig << " bytes (" << fixed << setprecision(2) << (orig/1024.0) << " KB)" << endl;
+                cout << "Compressed size: " << comp << " bytes (" << fixed << setprecision(2) << (comp/1024.0) << " KB)" << endl;
                 cout << "Compression ratio: " << fixed << setprecision(1)
                           << (orig > 0 ? (double)comp / orig * 100.0 : 0.0) << "%" << endl;
                 cout << "Time: " << fixed << setprecision(2) << duration << " ms" << endl;
@@ -264,13 +264,13 @@ public:
                     out.close();
                     
                     cout << "File stored (not compressed)" << endl;
-                    cout << "Original size: " << result.original_size << " bytes" << endl;
-                    cout << "Stored size: " << (result.original_size + 12) << " bytes (with header)" << endl;
+                    cout << "Original size: " << result.original_size << " bytes (" << fixed << setprecision(2) << (result.original_size/1024.0) << " KB)" << endl;
+                    cout << "Stored size: " << (result.original_size + 12) << " bytes (" << fixed << setprecision(2) << ((result.original_size+12)/1024.0) << " KB, with header)" << endl;
                     cout << "Compression ratio: 100.0%" << endl;
                 } else {
                     cout << "Compression successful!" << endl;
-                    cout << "Original size: " << result.original_size << " bytes" << endl;
-                    cout << "Compressed size: " << result.compressed_size << " bytes" << endl;
+                    cout << "Original size: " << result.original_size << " bytes (" << fixed << setprecision(2) << (result.original_size/1024.0) << " KB)" << endl;
+                    cout << "Compressed size: " << result.compressed_size << " bytes (" << fixed << setprecision(2) << (result.compressed_size/1024.0) << " KB)" << endl;
                     cout << "Compression ratio: " << fixed << setprecision(1) 
                               << result.compression_ratio << "%" << endl;
                 }
@@ -342,8 +342,8 @@ public:
         auto duration = chrono::duration<double, milli>(end - start).count();
         
         cout << "Decompression successful!" << endl;
-        cout << "Compressed size: " << result.compressed_size << " bytes" << endl;
-        cout << "Decompressed size: " << result.original_size << " bytes" << endl;
+        cout << "Compressed size: " << result.compressed_size << " bytes (" << fixed << setprecision(2) << (result.compressed_size/1024.0) << " KB)" << endl;
+        cout << "Decompressed size: " << result.original_size << " bytes (" << fixed << setprecision(2) << (result.original_size/1024.0) << " KB)" << endl;
         cout << "Time: " << fixed << setprecision(2) << duration << " ms" << endl;
     }
 
@@ -483,17 +483,26 @@ int main(int argc, char* argv[]) {
                 
                 cout << "Enter output file name: "; getline(cin, outName);
                 string outPath = "decompressed/" + outName;
-                cout << "Verify data integrity? (y/n): "; getline(cin, verifyStr);
-                if (!verifyStr.empty() && (verifyStr[0] == 'y' || verifyStr[0] == 'Y')) verify = true;
+                // Data integrity verification enabled by default
+                verify = true;
                 // Progress bar enabled by default
                 HuffmanCLI::decompressFile({"decompress", inPath, outPath, 5, false, progress, verify});
             } else if (choice == "4") {
                 // Compress folder
+
                 string folderName, archiveName, levelStr, verboseStr;
                 int level = 5;
                 bool verbose = true;
-                
-                cout << "Enter folder name to compress (in uploads): "; 
+
+                // List available folders in uploads
+                cout << "Available folders in uploads:" << endl;
+                for (const auto& entry : filesystem::directory_iterator("uploads")) {
+                    if (entry.is_directory()) {
+                        cout << "  - " << entry.path().filename().string() << endl;
+                    }
+                }
+                cout << endl;
+                cout << "Enter folder name to compress (in uploads): ";
                 getline(cin, folderName);
                 string folderPath = "uploads/" + folderName;
                 
@@ -513,28 +522,31 @@ int main(int argc, char* argv[]) {
                 
                 auto settings = huffman::make_settings_from_level(level);
                 settings.verbose = verbose;
+
+                // Prompt for hybrid mode
                 
+
                 huffman::FolderCompressor compressor;
-                
+
                 // Set progress callback
                 compressor.setProgressCallback([](size_t current, size_t total, const string& file) {
                     cout << "\rCompressing: [" << (current + 1) << "/" << total << "] "
                               << file << "          " << flush;
                     if (current + 1 == total) cout << endl;
                 });
-                
+
                 auto start = chrono::high_resolution_clock::now();
                 bool success = compressor.compressFolder(folderPath, archivePath, settings);
                 auto end = chrono::high_resolution_clock::now();
-                
+
                 if (success) {
                     auto duration = chrono::duration<double, milli>(end - start).count();
                     auto info = compressor.getArchiveInfo(archivePath);
-                    
+
                     cout << "\nFolder compression successful!" << endl;
                     cout << "Files compressed: " << info.header.file_count << endl;
-                    cout << "Total original size: " << info.header.total_original_size << " bytes" << endl;
-                    cout << "Total compressed size: " << info.header.total_compressed_size << " bytes" << endl;
+                    cout << "Total original size: " << info.header.total_original_size << " bytes (" << fixed << setprecision(2) << (info.header.total_original_size/1024.0) << " KB)" << endl;
+                    cout << "Total compressed size: " << info.header.total_compressed_size << " bytes (" << fixed << setprecision(2) << (info.header.total_compressed_size/1024.0) << " KB)" << endl;
                     cout << "Compression ratio: " << fixed << setprecision(1)
                               << (info.header.total_original_size > 0 
                                   ? (double)info.header.total_compressed_size / info.header.total_original_size * 100.0 

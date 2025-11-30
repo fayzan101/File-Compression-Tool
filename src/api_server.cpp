@@ -451,6 +451,7 @@ int main() {
     std::cout << "  POST /api/decompress-folder - Decompress an archive" << std::endl;
     std::cout << "  GET  /api/list - List files in uploads" << std::endl;
     std::cout << "  GET  /api/info/<filename> - Get file info" << std::endl;
+    std::cout << "  POST /api/tree-dot - Generate Huffman tree DOT file for a file in uploads" << std::endl;
     std::cout << "\nStarting server..." << std::endl;
 
     app.port(8081).multithreaded().run();
