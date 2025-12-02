@@ -215,31 +215,25 @@ bool Decompressor::decompress(const std::string& inPath, const std::string& outP
             throw huffman::HuffmanError(huffman::ErrorCode::CORRUPTED_HEADER, "Cannot read CRC32");
         }
 
-        // Stream compressed data and decode in chunks
-        constexpr size_t CHUNK_SIZE = 1024 * 1024; // 1MB
-        std::vector<unsigned char> buf;
-        buf.reserve(CHUNK_SIZE);
-        std::streampos data_start = in.tellg();
-        in.seekg(0, std::ios::end);
-        std::streampos data_end = in.tellg();
-        size_t data_size = static_cast<size_t>(data_end - data_start);
-        in.seekg(data_start, std::ios::beg);
-        size_t bytes_left = data_size;
-
-        // Read all compressed data for CRC check (streaming CRC possible, but keep logic simple)
+        // Read all compressed data into buffer
         std::vector<unsigned char> crc_buf;
-        while (bytes_left > 0) {
-            size_t to_read = std::min(CHUNK_SIZE, bytes_left);
-            std::vector<unsigned char> temp(to_read);
-            in.read(reinterpret_cast<char*>(temp.data()), to_read);
-            std::streamsize bytesRead = in.gcount();
-            if (bytesRead <= 0) break;
-            crc_buf.insert(crc_buf.end(), temp.begin(), temp.begin() + bytesRead);
-            bytes_left -= static_cast<size_t>(bytesRead);
+        {
+            std::streampos data_start = in.tellg();
+            in.seekg(0, std::ios::end);
+            std::streampos data_end = in.tellg();
+            size_t data_size = static_cast<size_t>(data_end - data_start);
+            in.seekg(data_start, std::ios::beg);
+            if (data_size == 0) {
+                throw huffman::HuffmanError(huffman::ErrorCode::CORRUPTED_HEADER, "No compressed data found");
+            }
+            crc_buf.resize(data_size);
+            in.read(reinterpret_cast<char*>(crc_buf.data()), data_size);
+            if (!in) {
+                throw huffman::HuffmanError(huffman::ErrorCode::CORRUPTED_HEADER, "Failed to read compressed data");
+            }
         }
-        if (crc_buf.empty()) {
-            throw huffman::HuffmanError(huffman::ErrorCode::CORRUPTED_HEADER, "No compressed data found");
-        }
+
+        // Verify CRC over raw compressed bitstream
         uint32_t crc_calc = huffman::CRC32::calculate(crc_buf);
         if (crc_calc != crc_stored) {
             throw huffman::HuffmanError(huffman::ErrorCode::CORRUPTED_HEADER, "CRC32 mismatch: file may be corrupted");
@@ -266,11 +260,12 @@ bool Decompressor::decompress(const std::string& inPath, const std::string& outP
                 codes[sorted[i].first] = bitstring(code, len);
             }
         }
+
         std::unordered_map<std::string, unsigned char> rev_codes;
         for (const auto& kv : codes) rev_codes[kv.second] = kv.first;
 
-        // Decode Huffman
-        std::vector<unsigned char> huff_decoded;
+        // Decode Huffman (compressed LZ77 byte stream for hybrid mode)
+        std::vector<unsigned char> decoded;
         {
             BitReader reader(crc_buf);
             std::string cur;
@@ -282,20 +277,20 @@ bool Decompressor::decompress(const std::string& inPath, const std::string& outP
                     cur += bit ? '1' : '0';
                     auto it = rev_codes.find(cur);
                     if (it != rev_codes.end()) {
-                        huff_decoded.push_back(it->second);
+                        decoded.push_back(it->second);
                         break;
                     }
                 }
             }
         }
 
-        // If hybrid, apply LZ77 decompression
-        std::vector<unsigned char> final_out;
+        // If this is hybrid (LZ77 + Huffman), apply LZ77 decompression
+        std::vector<unsigned char> final_output;
         if (is_hybrid) {
-            auto tokens = LZ77::bytesToTokens(huff_decoded);
-            final_out = LZ77::decompress(tokens);
+            auto tokens = LZ77::bytesToTokens(decoded);
+            final_output = LZ77::decompress(tokens);
         } else {
-            final_out = std::move(huff_decoded);
+            final_output = std::move(decoded);
         }
 
         // Write output file
@@ -303,7 +298,7 @@ bool Decompressor::decompress(const std::string& inPath, const std::string& outP
         if (!out) {
             throw huffman::HuffmanError(huffman::ErrorCode::FILE_WRITE_ERROR, outPath);
         }
-        out.write(reinterpret_cast<const char*>(final_out.data()), final_out.size());
+        out.write(reinterpret_cast<const char*>(final_output.data()), final_output.size());
         if (out.bad()) {
             throw huffman::HuffmanError(huffman::ErrorCode::FILE_WRITE_ERROR, outPath);
         }

@@ -1,0 +1,228 @@
+'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'dashboard_screen.dart' as dash;
+import 'menu.dart' as menu;
+import 'report.dart' as report;
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'add_product_screen.dart';
+import '../services/statement_service.dart';
+import '../services/auth_service.dart';
+import '../services/cities_service.dart';
+import 'dart:async';
+import '../network/order_service.dart';
+import '../utils/custom_snackbar.dart';
+import '../config/api_config.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'order_list_screen.dart';
+import 'ageing_report_screen.dart' as ageing_report;
+import 'courier_insights_screen.dart' as courier_insights;
+import 'courier_performance_screen.dart' as courier_performance;
+import 'package:dio/dio.dart';
+import '../utils/Layout/app_bottom_bar.dart';
+import 'dart:convert';
+
+class OrderItem {
+  final String name;
+  final String sku;
+  final String refCode;
+  final int qty;
+  final double price;
+  final String productCode;
+  final String variationId;
+  final String productId;
+  final String locationId;
+  final double weight;
+  OrderItem({
+    required this.name,
+    required this.sku,
+    required this.refCode,
+    required this.qty,
+    required this.price,
+    required this.productCode,
+    required this.variationId,
+    required this.productId,
+    required this.locationId,
+    required this.weight,
+  });
+}
+
+class CreateOrderScreen extends StatefulWidget {
+  final String? from;
+  const CreateOrderScreen({Key? key, this.from}) : super(key: key);
+
+  @override
+  State<CreateOrderScreen> createState() => _CreateOrderScreenState();
+}
+
+class _CreateOrderScreenState extends State<CreateOrderScreen> {
+  final List<OrderItem> _orders = [];
+  final Set<int> _expandedOrders = {};
+  bool _isDialogOpen = false;
+  String selectedCountry = 'Pakistan';
+  String? selectedCity;
+  List<String> cityList = [];
+  String selectedPaymentType = 'COD';
+  final List<String> paymentTypes = ['COD', 'JazzCash', 'EasyPaisa', 'CC'];
+
+  final AuthService _authService = Get.find<AuthService>();
+  bool _isSaving = false;
+  
+  List<Map<String, dynamic>> _platforms = [];
+  Map<String, dynamic>? _selectedPlatform;
+
+
+  String _platformSearch = '';
+  
+  final List<GlobalKey<_OrderFieldState>> _orderFieldKeys = List.generate(9, (_) => GlobalKey<_OrderFieldState>());
+  
+  final List<TextEditingController> _controllers = List.generate(9, (_) => TextEditingController());
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  List<Map<String, dynamic>> cityListData = [];
+  
+  Set<int> _missingRequiredFields = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCities();
+    _fetchPlatforms();
+  }
+
+  Future<void> _fetchCities() async {
+    try {
+      
+      final cachedCities = CitiesService.getCachedCities();
+      if (cachedCities != null) {
+        List<String> cities = [];
+        List<Map<String, dynamic>> cityObjs = [];
+        cityObjs = List<Map<String, dynamic>>.from(cachedCities);
+        
+       
+        
+        
+        // Use consistent field names - try both 'name' and 'city_name'
+        cities = cachedCities.map<String>((c) => 
+          (c['city_name'] ?? c['name'] ?? '').toString()
+        ).where((c) => c.isNotEmpty).toList();
+        
+        setState(() {
+          cityList = cities;
+          cityListData = cityObjs;
+          if (cityList.isNotEmpty) selectedCity = cityList.first;
+        });
+        return;
+      }
+      
+      
+      final countryId = 1;
+      final dio = Dio();
+      final response = await dio.post(
+        ApiConfig.getEndpointUrl(ApiConfig.citiesEndpoint),
+        data: {"country_id": countryId},
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        List<String> cities = [];
+        List<Map<String, dynamic>> cityObjs = [];
+        if (data is List) {
+          cityObjs = List<Map<String, dynamic>>.from(data);
+          cities = data.map<String>((c) => c['city_name']?.toString() ?? '').where((c) => c.isNotEmpty).toList();
+          
+          // Debug: Print API city structure
+          if (data.isNotEmpty) {
+            
+          }
+        } else if (data is Map && data['payload'] is List) {
+          cityObjs = List<Map<String, dynamic>>.from(data['payload']);
+          cities = (data['payload'] as List)
+              .map<String>((c) => c['city_name']?.toString() ?? '')
+              .where((c) => c.isNotEmpty)
+              .toList();
+          
+          // Debug: Print API payload city structure
+          if ((data['payload'] as List).isNotEmpty) {
+            
+          }
+        }
+        setState(() {
+          cityList = cities;
+          cityListData = cityObjs;
+          if (cityList.isNotEmpty) selectedCity = cityList.first;
+        });
+      }
+    } catch (e) {
+      
+    }
+  }
+
+  Future<void> _fetchPlatforms() async {
+    try {
+      final acno = _authService.getCurrentAcno();
+      if (acno == null) {
+        return;
+      }
+      final service = StatementService();
+      final platformData = await service.fetchShopNames(acno);
+      
+      final filtered = platformData.where((e) => (e['platform_name']?.toString() ?? '').isNotEmpty).toList();
+      setState(() {
+        _platforms = filtered;
+      });
+    } catch (e) {
+      
+    }
+  }
+
+  void _addOrder(OrderItem item) {
+    setState(() {
+      
+      final existingIndex = _orders.indexWhere((existingItem) => 
+        existingItem.sku == item.sku && 
+        existingItem.productId == item.productId &&
+        existingItem.locationId == item.locationId
+      );
+      
+      if (existingIndex != -1) {
+        
+        final existingItem = _orders[existingIndex];
+        final newQuantity = existingItem.qty + item.qty;
+        final newTotalPrice = (existingItem.price * existingItem.qty) + (item.price * item.qty);
+        final newAveragePrice = newTotalPrice / newQuantity;
+        
+        _orders[existingIndex] = OrderItem(
+          name: existingItem.name,
+          sku: existingItem.sku,
+          refCode: existingItem.refCode,
+          qty: newQuantity,
+          price: newAveragePrice,
+          productCode: existingItem.productCode,
+          variationId: existingItem.variationId,
+          productId: existingItem.productId,
+          locationId: existingItem.locationId,
+          weight: existingItem.weight,
+        );
+      } else {
+        
+        _orders.add(item);
+      }
+      
+      
+      final totalWeight = _orders.fold<double>(0, (sum, orderItem) => sum + (orderItem.weight * orderItem.qty));
+      _controllers[6].text = totalWeight.toStringAsFixed(2);
+    });
+  }
+
+  void _showSelectPlatformDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        String search = '';
+        List<Map<String, dynamic>> filteredPlatforms = _platforms;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            filteredPlatforms = _platforms.where((p) => (p['platfo

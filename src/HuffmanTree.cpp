@@ -94,11 +94,21 @@ void HuffmanTree::deserialize(const vector<unsigned char>& data) {
     root = deserializeNode(data, pos);
 }
 
-// Helper for DOT output
+// Helper for DOT output - escape characters safely for Graphviz labels
 static std::string escapeLabel(unsigned char c) {
-    if (std::isprint(c))
-        return std::string(1, c);
-    return std::to_string((int)c);
+    // Escape backslash and double-quote explicitly
+    if (c == '\\') return "\\\\";   // one backslash in label
+    if (c == '\"') return "\\\"";   // escaped quote in label
+
+    // Printable ASCII range: keep as-is
+    if (c >= 32 && c <= 126) {
+        return std::string(1, static_cast<char>(c));
+    }
+
+    // Non-printable: render as \xHH
+    char buf[5];
+    std::snprintf(buf, sizeof(buf), "\\x%02X", c);
+    return std::string(buf);
 }
 
 static void toDotNode(const shared_ptr<HuffmanNode>& node, std::ostream& out, std::unordered_map<const HuffmanNode*, int>& ids, int& idCounter) {

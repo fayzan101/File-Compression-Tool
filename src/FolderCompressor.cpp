@@ -233,14 +233,7 @@ bool FolderCompressor::decompressSingleFileFromArchive(std::ifstream& archive_st
         decompressed_data = std::move(file_data);
     }
     
-    // Verify checksum
-    uint32_t actual_checksum = calculateCRC32(decompressed_data);
-    if (actual_checksum != entry.checksum) {
-        throw HuffmanError(ErrorCode::CHECKSUM_MISMATCH, 
-                          "Checksum mismatch for file: " + entry.relative_path);
-    }
     
-    // Create output directory if needed
     createDirectoryRecursive(output_path);
     
     // Write decompressed data

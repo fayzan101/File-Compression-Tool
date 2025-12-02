@@ -80,12 +80,17 @@ int main() {
         if (!fs::exists(dotDir)) {
             fs::create_directory(dotDir);
         }
-        std::string dotPath = dotDir + "/" + filename + ".dot";
+        // Remove any extension (e.g., .txt) from the requested filename
+        fs::path fnamePath(filename);
+        std::string baseName = fnamePath.stem().string();
+        if (baseName.empty()) baseName = filename;
+
+        std::string dotPath = dotDir + "/" + baseName + ".dot";
         writeFile(dotPath, dot);
         crow::json::wvalue response;
         response["success"] = true;
+        response["filename"] = filename;
         response["dot_file"] = dotPath;
-        response["dot_content"] = dot;
         return crow::response(200, response);
     });
 
@@ -119,11 +124,24 @@ int main() {
             return crow::response(400, "Invalid JSON");
         }
 
+        // Require both filename and level explicitly
+        if (!body.has("filename") || !body.has("level")) {
+            crow::json::wvalue error;
+            error["error"] = "Missing required fields";
+            error["message"] = "'filename' and 'level' are required";
+            return crow::response(400, error);
+        }
+
         std::string filename = body["filename"].s();
-        int level = body.has("level") ? body["level"].i() : 5; // Default level 5
+        int level = body["level"].i();
         
         std::string inputPath = "uploads/" + filename;
-        std::string outputName = filename + ".zip";
+
+        // Derive a clean base name without extension for the output archive
+        fs::path inPathFs(filename);
+        std::string baseName = inPathFs.stem().string();
+        if (baseName.empty()) baseName = filename;
+        std::string outputName = baseName + ".zip";
         std::string outputPath = "compressed/" + outputName;
 
         // Check if file exists
@@ -151,28 +169,19 @@ int main() {
                 return crow::response(500, error);
             }
 
-            // Check if stored instead
-            bool stored = false;
-            if (result.compressed_size >= result.original_size * 0.95) {
-                stored = true;
-                // Create stored format
-                std::ofstream out(outputPath, std::ios::binary);
-                std::ifstream in(inputPath, std::ios::binary);
-                out.write("STOR", 4);
-                uint64_t size = result.original_size;
-                out.write(reinterpret_cast<const char*>(&size), sizeof(uint64_t));
-                out << in.rdbuf();
-            }
-
             crow::json::wvalue response;
             response["success"] = true;
             response["filename"] = filename;
             response["output"] = outputName;
-            response["original_size"] = result.original_size;
-            response["compressed_size"] = stored ? result.original_size + 12 : result.compressed_size;
-            response["compression_ratio"] = stored ? 100.0 : result.compression_ratio;
-            response["time_ms"] = duration;
-            response["stored"] = stored;
+
+            // Return sizes in KB directly in original_size and compressed_size
+            double original_kb = static_cast<double>(result.original_size) / 1024.0;
+            double compressed_kb = static_cast<double>(result.compressed_size) / 1024.0;
+            response["original_size"] = std::round(original_kb * 100.0) / 100.0;
+            response["compressed_size"] = std::round(compressed_kb * 100.0) / 100.0;
+
+            response["compression_ratio"] = std::round(result.compression_ratio * 100.0) / 100.0;
+            response["time_ms"] = std::round(duration * 100.0) / 100.0;
             response["level"] = level;
 
             return crow::response(200, response);
@@ -194,8 +203,25 @@ int main() {
             return crow::response(400, "Invalid JSON");
         }
 
+        if (!body.has("filename")) {
+            crow::json::wvalue error;
+            error["error"] = "Missing required field";
+            error["message"] = "'filename' is required";
+            return crow::response(400, error);
+        }
+
         std::string filename = body["filename"].s();
-        std::string outputName = body["output"].s();
+
+        // Make output optional: if not provided, derive from filename stem
+        std::string outputName;
+        if (body.has("output")) {
+            outputName = body["output"].s();
+        } else {
+            fs::path p(filename);
+            std::string base = p.stem().string();
+            if (base.empty()) base = filename;
+            outputName = base;
+        }
         
         std::string inputPath = "compressed/" + filename;
         std::string outputPath = "decompressed/" + outputName;
@@ -249,9 +275,9 @@ int main() {
             response["success"] = true;
             response["filename"] = filename;
             response["output"] = outputName;
-            response["size"] = file_size;
-            response["time_ms"] = duration;
-            response["was_stored"] = was_stored;
+            // Return size in KB directly in size
+            response["size"] = std::round(static_cast<double>(file_size) / 1024.0 * 100.0) / 100.0;
+            response["time_ms"] = std::round(duration * 100.0) / 100.0;
 
             return crow::response(200, response);
 
@@ -305,17 +331,21 @@ int main() {
 
             auto info = compressor.getArchiveInfo(archivePath);
 
+            // Convert sizes to KB and round to 2 decimal places
+            double original_kb = static_cast<double>(info.header.total_original_size) / 1024.0;
+            double compressed_kb = static_cast<double>(info.header.total_compressed_size) / 1024.0;
+
             crow::json::wvalue response;
             response["success"] = true;
             response["folder"] = foldername;
             response["archive"] = archiveName;
             response["file_count"] = info.header.file_count;
-            response["original_size"] = info.header.total_original_size;
-            response["compressed_size"] = info.header.total_compressed_size;
+            response["original_size"] = std::round(original_kb * 100.0) / 100.0;
+            response["compressed_size"] = std::round(compressed_kb * 100.0) / 100.0;
             response["compression_ratio"] = (info.header.total_original_size > 0 
                 ? (double)info.header.total_compressed_size / info.header.total_original_size * 100.0 
                 : 0.0);
-            response["time_ms"] = duration;
+            response["time_ms"] = std::round(duration * 100.0) / 100.0;
 
             return crow::response(200, response);
 
@@ -363,11 +393,23 @@ int main() {
                 return crow::response(500, error);
             }
 
+            auto info = compressor.getArchiveInfo(archivePath);
+
+            // Convert sizes to KB and round to 2 decimal places
+            double original_kb = static_cast<double>(info.header.total_original_size) / 1024.0;
+            double compressed_kb = static_cast<double>(info.header.total_compressed_size) / 1024.0;
+
             crow::json::wvalue response;
             response["success"] = true;
             response["archive"] = archiveName;
             response["output_folder"] = outputFolder;
-            response["time_ms"] = duration;
+            response["file_count"] = info.header.file_count;
+            response["original_size"] = std::round(original_kb * 100.0) / 100.0;
+            response["compressed_size"] = std::round(compressed_kb * 100.0) / 100.0;
+            response["compression_ratio"] = (info.header.total_original_size > 0 
+                ? (double)info.header.total_compressed_size / info.header.total_original_size * 100.0 
+                : 0.0);
+            response["time_ms"] = std::round(duration * 100.0) / 100.0;
 
             return crow::response(200, response);
 

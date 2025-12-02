@@ -374,14 +374,12 @@ int main(int argc, char* argv[]) {
         cout << "\nMenu:\n";
         cout << "  1. Compress File\n";
         cout << "  2. Hybrid Compress (LZ77 + Huffman)\n";
-        cout << "  3. Decompress file\n";
+        cout << "  3. Decompress File\n";
         cout << "  4. Compress Folder\n";
-        cout << "  5. Decompress Folder\n";
-        cout << "  6. List Archive Files\n";
-        // ...existing code...
-        cout << "  8. Info (show compressed file info)\n";
-        cout << "  9. Show Huffman Tree (DOT export)\n";
-        cout << " 10. Help\n";
+        cout << "  5. List Archive Files\n";
+        cout << "  6. Info (show compressed file info)\n";
+        cout << "  7. Show Huffman Tree (DOT export)\n";
+        cout << "  8. Help\n";
         cout << "  0. Exit\n";
         cout << "Select an option: ";
         string choice;
@@ -557,44 +555,6 @@ int main(int argc, char* argv[]) {
                 }
                 
             } else if (choice == "5") {
-                // Decompress archive
-                string archiveName, outputFolderName;
-                
-                cout << "Enter archive name (without extension): "; 
-                getline(cin, archiveName);
-                
-                // Automatically add .zip extension and use compressed folder
-                if (archiveName.find('.') == string::npos) {
-                    archiveName += ".zip";
-                }
-                string archivePath = "compressed/" + archiveName;
-                
-                cout << "Enter output folder name: "; 
-                getline(cin, outputFolderName);
-                string outputFolder = "decompressed/" + outputFolderName;
-                
-                huffman::FolderCompressor compressor;
-                
-                // Set progress callback
-                compressor.setProgressCallback([](size_t current, size_t total, const string& file) {
-                    cout << "\rExtracting: [" << (current + 1) << "/" << total << "] "
-                              << file << "          " << flush;
-                    if (current + 1 == total) cout << endl;
-                });
-                
-                auto start = chrono::high_resolution_clock::now();
-                bool success = compressor.decompressArchive(archivePath, outputFolder);
-                auto end = chrono::high_resolution_clock::now();
-                
-                if (success) {
-                    auto duration = chrono::duration<double, milli>(end - start).count();
-                    cout << "\nArchive extraction successful!" << endl;
-                    cout << "Time: " << fixed << setprecision(2) << duration << " ms" << endl;
-                } else {
-                    cout << "Archive extraction failed!" << endl;
-                }
-                
-            } else if (choice == "6") {
                 // List archive files
                 string archiveName;
                 
@@ -646,7 +606,7 @@ int main(int argc, char* argv[]) {
                     cout << "  Stored files: " << stored_count << endl;
                 }
             // ...existing code...
-            } else if (choice == "8") {
+            } else if (choice == "6") {
                 // Show available files in compressed folder
                 cout << "\nAvailable files in compressed folder:" << endl;
                 int fileCount = 0;
@@ -668,8 +628,20 @@ int main(int argc, char* argv[]) {
                     inName += ".zip";
                 }
                 string inPath = "compressed/" + inName;
-                HuffmanCLI::showFileInfo({"info", inPath});
-            } else if (choice == "9") {
+
+                // Use library helper to show more detailed size info
+                bool valid = huffman::isValidCompressedFile(inPath);
+                cout << "File Information: " << inPath << "\n";
+                cout << "Valid Huffman file: " << (valid ? "Yes" : "No") << "\n";
+                if (valid) {
+                    size_t bytes = huffman::getCompressedFileSize(inPath);
+                    double kb = bytes / 1024.0;
+                    double mb = kb / 1024.0;
+                    cout << "Compressed size: " << bytes << " bytes (" 
+                         << fixed << setprecision(2) << kb << " KB, " 
+                         << mb << " MB)" << "\n";
+                }
+            } else if (choice == "7") {
                 // Show Huffman Tree (DOT export)
                 // List available files in uploads folder
                 cout << "\nAvailable files in uploads folder:" << endl;
@@ -688,6 +660,19 @@ int main(int argc, char* argv[]) {
                 cout << "Enter input file name (from uploads): ";
                 getline(cin, inName);
                 string inPath = "uploads/" + inName;
+
+                // Ask user for DOT output file name
+                cout << "Enter DOT output file name (without extension): ";
+                string dotName;
+                getline(cin, dotName);
+                if (dotName.empty()) {
+                    dotName = "tree"; // default name if user presses enter
+                }
+                // Ensure .dot extension and write inside dot/ folder
+                if (dotName.find('.') == string::npos) {
+                    dotName += ".dot";
+                }
+                string dotPath = string("dot/") + dotName;
                 ifstream fin(inPath, ios::binary);
                 if (!fin) {
                     cout << "File not found: " << inPath << endl;
@@ -701,13 +686,13 @@ int main(int argc, char* argv[]) {
                         HuffmanTree tree;
                         tree.build(freq);
                         string dot = tree.toDot();
-                        ofstream fout("uploads/tree.dot");
+                        ofstream fout(dotPath);
                         fout << dot;
                         fout.close();
-                        cout << "Huffman tree DOT file written to uploads/tree.dot\n";
+                        cout << "Huffman tree DOT file written to " << dotPath << "\n";
                     }
                 }
-            } else if (choice == "10") {
+            } else if (choice == "8") {
                 HuffmanCLI::printUsage();
             } else {
                 cout << "Invalid option. Please enter a number from 0 to 9." << endl;
